@@ -13,10 +13,7 @@
 <label>Nombre completo<input name="contact" required></label>
 <label>Correo electrónico<input type="email" name="email" required></label>
 <label>Teléfono<input type="tel" name="phone" required></label></div>
-<div class="authorization">
-<a href="#authorizationDetails" data-authorization="newsletter" aria-haspopup="dialog">Boletines del club</a>
-<label><input name="newsletter" type="checkbox"> Quiero recibir boletines sobre las actividades del club</label>
-</div>
+<p class="authorization"><a href="https://chat.whatsapp.com/HCeexWXYCFO7ayt5HTg3wP?s=sw&amp;p=a&amp;iam=2" target="_blank" rel="noopener noreferrer">Entrar al canal de información general del club en WhatsApp</a></p>
 <label><input name="member" type="checkbox"> Al menos un progenitor ya es socio</label>
 </fieldset>
 <div id="players"></div>
@@ -27,7 +24,7 @@
 </fieldset>
 <button type="submit">Revisar inscripción</button>
 </form>
-<section id="summary" hidden tabindex="-1"><h2>Resumen de la inscripción</h2><ul id="breakdown"></ul><p id="newsletterSummary"></p><output id="total"></output><p id="schedule"></p><p id="membership"></p><small>El resumen es una simulación. Los datos introducidos se quedan en esta página.</small></section>
+<section id="summary" hidden tabindex="-1"><h2>Resumen de la inscripción</h2><ul id="breakdown"></ul><output id="total"></output><p id="schedule"></p><p id="membership"></p><small>El resumen es una simulación. Los datos introducidos se quedan en esta página.</small></section>
 </main>
 <template id="player">
 <fieldset class="player">
@@ -71,7 +68,17 @@
 </template>
 <dialog id="authorizationDetails" aria-labelledby="authorizationTitle">
 <h2 id="authorizationTitle"></h2>
-<p id="authorizationText"></p>
+<div id="authorizationText"></div>
+<template id="federatedProtocol">
+<p><small>Referencia para preparar la temporada 2027/2028. El club confirmará la póliza, los centros y los contactos antes de abrir la inscripción.</small></p>
+<p><strong>Urgencia vital.</strong> Llama al <a href="tel:112">112</a> o acude al centro más cercano. Avisa al entrenador cuando sea posible.</p>
+<p><strong>Urgencia deportiva.</strong> Avisa al entrenador y llama a Nueva Mutua Sanitaria al <a href="tel:900909766">900 90 97 66</a> (24 h) para que te indique el centro concertado y gestione la autorización si hace falta. El protocolo prevé la atención urgente dentro de las primeras 48 horas. El club recomienda consultar por Montepríncipe, especialmente los fines de semana. Confirma el centro con la aseguradora.</p>
+<p><strong>Si no es urgente.</strong> Pide el parte al club y solicita autorización para una cita en un centro concertado. Llama al <a href="tel:+34912908075">91 290 80 75</a> (lunes a viernes, de 8:00 a 20:00) o escribe a <a href="mailto:accidentesdeportivos@nuevamutuasanitaria.es">accidentesdeportivos@nuevamutuasanitaria.es</a>.</p>
+<p><strong>Comunica el accidente en un máximo de 72 horas</strong>, hayas ido a urgencias o no. Envía a la aseguradora el parte cumplimentado y, si los tienes, el informe de urgencias y los volantes o prescripciones. Si te piden identificar al jugador en el centro, ten a mano su DNI.</p>
+<p><strong>Seguimiento y vuelta al deporte.</strong> Pide autorización previa para pruebas, revisiones, traumatología o rehabilitación. Tras cada visita, envía el informe y la prescripción que te hayan entregado. Una vez tramitado el parte, espera al alta médica deportiva para volver a entrenar o competir y envíala a la aseguradora.</p>
+<p><a href="https://share.google/MhP34JH0n7DrGtNbb" target="_blank" rel="noopener noreferrer">Consultar la documentación compartida por el club</a><br>
+<a href="https://www.fmbalonmano.com/administracion-seguro-deportivo" target="_blank" rel="noopener noreferrer">Seguro deportivo de la Federación Madrileña de Balonmano</a></p>
+</template>
 <button type="button" data-privacy>Leer el aviso de privacidad</button>
 <form method="dialog"><button autofocus>Cerrar</button></form>
 </dialog>
@@ -85,5 +92,5 @@
 <p><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es" target="_blank" rel="noopener noreferrer">Reglamento General de Protección de Datos</a> · <a href="https://boe.es/eli/es/lo/2018/12/05/3/con" target="_blank" rel="noopener noreferrer">Ley Orgánica 3/2018</a></p>
 <form method="dialog"><button autofocus>Cerrar</button></form>
 </dialog>
-<script src="inscripcion.js?v=b81bb65653ca"></script>
+<script src="inscripcion.js?v=275649f809f6"></script>
 </html>

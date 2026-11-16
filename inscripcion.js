@@ -45,10 +45,8 @@ if (typeof document !== 'undefined') {
     button.addEventListener('click', () => privacyDetails.showModal());
   }
   const authorizationTexts = {
-    federatedProtocol: 'Borrador 2027/2028. Ante un accidente durante un partido o entrenamiento, avisa al entrenador. El club facilitará la ficha y el parte de accidente y explicará cómo acudir a un centro concertado. El club publicará el cuadro médico y los contactos del seguro cuando estén confirmados.',
     nonFederatedProtocol: 'Borrador 2027/2028. Este apartado corresponde a Prebenjamín y Benjamín. Ante un accidente durante la actividad, avisa al entrenador. El club facilitará el procedimiento aplicable cuando esté confirmado.',
 
-    newsletter: 'Si marcas esta casilla, el club podrá enviarte boletines sobre sus actividades. Puedes pedir que deje de enviarlos escribiendo al club.',
     outings: 'Al elegir Sí, autorizas al jugador o jugadora a participar en actividades de balonmano fuera del pabellón Sandra Aguilar y a acudir a otras instalaciones deportivas bajo la supervisión del entrenador o de la persona designada por el club.',
     transport: 'Al elegir Sí, autorizas los desplazamientos a partidos o entrenamientos en coche particular de un compañero o entrenador previo acuerdo entre las partes. También autorizas los desplazamientos a torneos del club en transporte contratado o en vehículos particulares de familias o entrenadores, con información previa del viaje.',
     images: 'Al elegir Sí, autorizas al Club Balonmano Pinto a publicar fotografías del jugador o jugadora tomadas durante las actividades del club en su web, boletines y memorias o publicaciones relacionadas con esas actividades.',
@@ -58,7 +56,12 @@ if (typeof document !== 'undefined') {
     if (!link) return;
     event.preventDefault();
     document.querySelector('#authorizationTitle').textContent = link.textContent;
-    document.querySelector('#authorizationText').textContent = authorizationTexts[link.dataset.authorization];
+    const content = document.querySelector('#authorizationText');
+    if (link.dataset.authorization === 'federatedProtocol') {
+      content.replaceChildren(document.querySelector('#federatedProtocol').content.cloneNode(true));
+    } else {
+      content.textContent = authorizationTexts[link.dataset.authorization];
+    }
     authorizationDetails.showModal();
   });
   const euro = new Intl.NumberFormat('es-ES', {style:'currency',currency:'EUR'});
@@ -212,8 +215,6 @@ if (typeof document !== 'undefined') {
         euro.format(calculated.lines.reduce((sum,line) => sum + line.payments[index],0)) + ' ' + date).join(' | ');
     document.querySelector('#membership').textContent = !undecided && calculated.laterDiscount
       ? 'Si os hacéis socios después de inscribiros, el descuento orientativo en el alta será de ' + euro.format(calculated.laterDiscount) + '.' : '';
-    document.querySelector('#newsletterSummary').textContent =
-      'Boletines del club · ' + (form.elements.newsletter.checked ? 'Sí' : 'No');
     summary.hidden = false;
     summary.focus();
   };
