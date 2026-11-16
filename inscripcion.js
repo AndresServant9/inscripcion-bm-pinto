@@ -135,6 +135,7 @@ if (typeof document !== 'undefined') {
     }));
     const undecided = players.some(player => !player.team);
     const calculated = calculate(players, form.elements.member.checked);
+    const payment = form.elements.payment.value;
     const list = document.querySelector('#breakdown');
     list.replaceChildren(...players.map((player, index) => {
       const item = document.createElement('li');
@@ -142,11 +143,28 @@ if (typeof document !== 'undefined') {
       item.textContent = [player.name, player.category.name, player.kit, 'Estampado ' + player.printName,
         !line ? 'Equipo pendiente de confirmar' : line.team === 'national' ? 'Primera Nacional · Exento' :
           euro.format(line.total) + (line.discount ? ' con ' + euro.format(line.discount) + ' de descuento' : '')].join(' · ');
+      if (line && line.total > 0) {
+        const payments = payment === 'single'
+          ? [{label: 'Pago único', amount: line.total, deadline: season.dates[0]}]
+          : line.payments.map((amount, index) => ({
+              label: 'Pago ' + (index + 1), amount, deadline: season.dates[index],
+            }));
+        const table = document.createElement('ul');
+        for (const {label, amount, deadline} of payments) {
+          const row = document.createElement('li');
+          const concept = [label, player.name, player.category.name].join(' ').toLocaleUpperCase('es-ES');
+          row.textContent = label + ' · ' + euro.format(amount) + ' ' + deadline;
+          const reference = document.createElement('small');
+          reference.textContent = 'Concepto de transferencia ' + concept;
+          row.append(reference);
+          table.append(row);
+        }
+        item.append(table);
+      }
       return item;
     }));
     const total = calculated.lines.reduce((sum, line) => sum + line.total, 0);
     document.querySelector('#total').textContent = undecided ? 'Total pendiente de confirmar el equipo' : 'Total familiar ' + euro.format(total);
-    const payment = form.elements.payment.value;
     document.querySelector('#schedule').textContent = undecided ? '' : payment === 'single'
       ? 'Pago único de ' + euro.format(total) + ' ' + season.dates[0] + '.'
       : season.dates.map((date,index) => 'Pago ' + (index+1) + ' · ' +
