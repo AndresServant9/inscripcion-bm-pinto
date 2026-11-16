@@ -33,6 +33,10 @@ if (typeof document !== 'undefined') {
   const container = document.querySelector('#players');
   const summary = document.querySelector('#summary');
   const authorizationDetails = document.querySelector('#authorizationDetails');
+  const privacyDetails = document.querySelector('#privacyDetails');
+  for (const button of document.querySelectorAll('[data-privacy]')) {
+    button.addEventListener('click', () => privacyDetails.showModal());
+  }
   const authorizationTexts = {
     outings: 'Al elegir Sí, autorizas al jugador o jugadora a participar en actividades de balonmano fuera del pabellón Sandra Aguilar y a acudir a otras instalaciones deportivas bajo la supervisión del entrenador o de la persona designada por el club.',
     transport: 'Al elegir Sí, autorizas los desplazamientos a partidos o entrenamientos en coche particular de un compañero o entrenador previo acuerdo entre las partes. También autorizas los desplazamientos a torneos del club en transporte contratado o en vehículos particulares de familias o entrenadores, con información previa del viaje.',
@@ -57,6 +61,25 @@ if (typeof document !== 'undefined') {
   }
   function updatePlayer(player) {
     const category = categoryFor(field(player, 'birth').value);
+    const birth = field(player, 'birth').value;
+    const minor = Boolean(birth) && birth > (season.year - 18) + '-07-01';
+    const noPlayerId = field(player, 'noPlayerId');
+    noPlayerId.disabled = !minor;
+    if (!minor) noPlayerId.checked = false;
+    player.querySelector('.no-player-id').hidden = !minor;
+    const playerId = field(player, 'playerId');
+    playerId.disabled = noPlayerId.checked;
+    playerId.required = !noPlayerId.checked;
+    const guardianId = field(player, 'guardianId');
+    guardianId.disabled = !minor;
+    guardianId.required = minor;
+    player.querySelector('.guardian-id').hidden = !minor;
+    const reportHealth = field(player, 'hasHealth').value === 'yes';
+    const health = field(player, 'health');
+    health.disabled = !reportHealth;
+    health.required = reportHealth;
+    if (!reportHealth) health.value = '';
+    player.querySelector('.health-detail').hidden = !reportHealth;
     const seniorMale = category?.name === 'Sénior' && field(player, 'division').value === 'male';
     field(player, 'team').disabled = !seniorMale;
     player.querySelector('.senior').hidden = !seniorMale;
