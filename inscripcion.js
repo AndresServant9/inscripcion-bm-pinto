@@ -45,6 +45,9 @@ if (typeof document !== 'undefined') {
     button.addEventListener('click', () => privacyDetails.showModal());
   }
   const authorizationTexts = {
+    federatedProtocol: 'Borrador 2027/2028. Ante un accidente durante un partido o entrenamiento, avisa al entrenador. El club facilitará la ficha y el parte de accidente y explicará cómo acudir a un centro concertado. El club publicará el cuadro médico y los contactos del seguro cuando estén confirmados.',
+    nonFederatedProtocol: 'Borrador 2027/2028. Este apartado corresponde a Prebenjamín y Benjamín. Ante un accidente durante la actividad, avisa al entrenador. El club facilitará el procedimiento aplicable cuando esté confirmado.',
+
     newsletter: 'Si marcas esta casilla, el club podrá enviarte boletines sobre sus actividades. Puedes pedir que deje de enviarlos escribiendo al club.',
     outings: 'Al elegir Sí, autorizas al jugador o jugadora a participar en actividades de balonmano fuera del pabellón Sandra Aguilar y a acudir a otras instalaciones deportivas bajo la supervisión del entrenador o de la persona designada por el club.',
     transport: 'Al elegir Sí, autorizas los desplazamientos a partidos o entrenamientos en coche particular de un compañero o entrenador previo acuerdo entre las partes. También autorizas los desplazamientos a torneos del club en transporte contratado o en vehículos particulares de familias o entrenadores, con información previa del viaje.',
@@ -100,9 +103,13 @@ if (typeof document !== 'undefined') {
     field(player, 'team').disabled = !seniorMale;
     player.querySelector('.senior').hidden = !seniorMale;
     player.querySelector('.category').textContent = category?.name || '';
-    player.querySelector('.protocol').textContent = category ? (category.federated
-      ? 'Federado · Se aplicará el protocolo deportivo de la temporada.'
-      : 'No federado · Se aplicará el procedimiento que confirme el club.') : '';
+    const protocol = player.querySelector('.protocol');
+    protocol.hidden = !category;
+    if (category) {
+      const link = protocol.querySelector('a');
+      link.dataset.authorization = category.federated ? 'federatedProtocol' : 'nonFederatedProtocol';
+      link.textContent = category.federated ? 'Protocolo de accidentes para federados' : 'Protocolo de accidentes para no federados';
+    }
     for (const name of ['shirt','shorts']) {
       field(player, name).disabled = field(player, 'fitted').checked;
     }
