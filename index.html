@@ -3,7 +3,7 @@
 <title>Inscripción 2027/2028 · Balonmano Pinto</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f5f3ef;color:#242424;font:16px/1.5 system-ui,sans-serif}main{max-width:780px;margin:auto;padding:18px}header{background:#242424;color:white;border-radius:16px;padding:24px;display:flex;gap:20px;align-items:center}header img{width:75px}h1,h2{margin:0 0 .4em}header p{margin:0;color:#f6e34e}fieldset,section{background:white;border:1px solid #dedbd5;border-radius:12px;padding:18px;margin:20px 0;min-width:0}legend{font-weight:750}label{display:block;margin:.6rem 0}input:not([type=radio]):not([type=checkbox]),select,textarea{display:block;width:100%;padding:10px;border:1px solid #aaa;border-radius:6px;font:inherit}button{border:0;border-radius:7px;padding:12px 16px;background:#b60934;color:white;font:inherit;font-weight:700;cursor:pointer}button.secondary{background:#242424}small{display:block;color:#555}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:0 16px}output{display:block;font-weight:750}ul{padding-left:1.3rem}[hidden]{display:none!important}
-.authorization{margin:.6rem 0}.authorization a{color:#a20830;font-weight:650;text-underline-offset:.2em}dialog{width:min(92vw,520px);max-height:85vh;border:0;border-radius:14px;padding:24px;color:inherit;box-shadow:0 12px 40px #0004}dialog::backdrop{background:#0008}</style>
+.authorization{margin:.6rem 0}.authorization a{color:#a20830;font-weight:650;text-underline-offset:.2em}dialog{width:min(92vw,520px);max-height:85vh;border:0;border-radius:14px;padding:24px;color:inherit;box-shadow:0 12px 40px #0004}dialog::backdrop{background:#0008}.copy-concept{background:#eee;color:#242424;padding:.35rem .65rem;font-size:.85rem;margin:.25rem 0 .55rem}</style>
 <main>
 <header><img src="escudo.png" alt="Escudo del club"><div><p>Club Balonmano Pinto</p><h1>Inscripción 2027/2028</h1></div></header>
 <p>Prototipo con datos ficticios. Las cuotas, fechas y años de nacimiento son orientativos.</p>
@@ -13,6 +13,10 @@
 <label>Nombre completo<input name="contact" required></label>
 <label>Correo electrónico<input type="email" name="email" required></label>
 <label>Teléfono<input type="tel" name="phone" required></label></div>
+<div class="authorization">
+<a href="#authorizationDetails" data-authorization="newsletter" aria-haspopup="dialog">Boletines del club</a>
+<label><input name="newsletter" type="checkbox"> Quiero recibir boletines sobre las actividades del club</label>
+</div>
 <label><input name="member" type="checkbox"> Al menos un progenitor ya es socio</label>
 </fieldset>
 <div id="players"></div>
@@ -23,7 +27,7 @@
 </fieldset>
 <button type="submit">Revisar inscripción</button>
 </form>
-<section id="summary" hidden tabindex="-1"><h2>Resumen de la inscripción</h2><ul id="breakdown"></ul><output id="total"></output><p id="schedule"></p><p id="membership"></p><small>El resumen es una simulación. Los datos introducidos se quedan en esta página.</small></section>
+<section id="summary" hidden tabindex="-1"><h2>Resumen de la inscripción</h2><ul id="breakdown"></ul><p id="newsletterSummary"></p><output id="total"></output><p id="schedule"></p><p id="membership"></p><small>El resumen es una simulación. Los datos introducidos se quedan en esta página.</small></section>
 </main>
 <template id="player">
 <fieldset class="player">
@@ -41,6 +45,12 @@
 <label class="guardian-id" hidden>Documento del padre, madre o tutor<input name="guardianId" maxlength="12" disabled></label>
 
 <small class="protocol"></small>
+<div class="grid">
+<label>Domicilio del jugador<input name="address" autocomplete="street-address" maxlength="200" required></label>
+<label>Localidad<select name="town" required><option value="">Selecciona</option><option>Pinto</option><option>Valdemoro</option><option>Seseña</option><option>Leganés</option><option>Aranjuez</option><option value="other">Otra</option></select></label>
+<label class="other-town" hidden>Indica la localidad<input name="otherTown" maxlength="100" disabled></label>
+<label>¿Está empadronado en Pinto?<select name="registeredInPinto" required><option value="">Selecciona</option><option>Sí</option><option>No</option></select></label>
+</div>
 <div class="grid">
 <label>Nombre para estampar<input name="printName" maxlength="30" required></label>
 <label>Talla de camiseta<select name="shirt" required></select></label>
@@ -75,5 +85,5 @@
 <p><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es" target="_blank" rel="noopener noreferrer">Reglamento General de Protección de Datos</a> · <a href="https://boe.es/eli/es/lo/2018/12/05/3/con" target="_blank" rel="noopener noreferrer">Ley Orgánica 3/2018</a></p>
 <form method="dialog"><button autofocus>Cerrar</button></form>
 </dialog>
-<script src="inscripcion.js?v=7b726922e693"></script>
+<script src="inscripcion.js?v=05997fc36bd8"></script>
 </html>

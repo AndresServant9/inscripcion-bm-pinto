@@ -45,11 +45,12 @@ if (typeof document !== 'undefined') {
     button.addEventListener('click', () => privacyDetails.showModal());
   }
   const authorizationTexts = {
+    newsletter: 'Si marcas esta casilla, el club podrá enviarte boletines sobre sus actividades. Puedes pedir que deje de enviarlos escribiendo al club.',
     outings: 'Al elegir Sí, autorizas al jugador o jugadora a participar en actividades de balonmano fuera del pabellón Sandra Aguilar y a acudir a otras instalaciones deportivas bajo la supervisión del entrenador o de la persona designada por el club.',
     transport: 'Al elegir Sí, autorizas los desplazamientos a partidos o entrenamientos en coche particular de un compañero o entrenador previo acuerdo entre las partes. También autorizas los desplazamientos a torneos del club en transporte contratado o en vehículos particulares de familias o entrenadores, con información previa del viaje.',
     images: 'Al elegir Sí, autorizas al Club Balonmano Pinto a publicar fotografías del jugador o jugadora tomadas durante las actividades del club en su web, boletines y memorias o publicaciones relacionadas con esas actividades.',
   };
-  container.addEventListener('click', event => {
+  form.addEventListener('click', event => {
     const link = event.target.closest('[data-authorization]');
     if (!link) return;
     event.preventDefault();
@@ -68,6 +69,11 @@ if (typeof document !== 'undefined') {
   }
   function updatePlayer(player) {
     const category = categoryFor(field(player, 'birth').value);
+    const showOtherTown = field(player, 'town').value === 'other';
+    const otherTown = field(player, 'otherTown');
+    otherTown.disabled = !showOtherTown;
+    otherTown.required = showOtherTown;
+    player.querySelector('.other-town').hidden = !showOtherTown;
     const birth = field(player, 'birth').value;
     const age = ageOnDate(birth);
     const minor = age !== null && age < 18;
@@ -132,6 +138,13 @@ if (typeof document !== 'undefined') {
       kit: field(player, 'fitted').checked ? 'Tallas tomadas en el club' :
         'Camiseta ' + field(player, 'shirt').value + ' · Pantalón ' + field(player, 'shorts').value,
       printName: field(player, 'printName').value.trim(),
+      town: field(player, 'town').value === 'other' ? field(player, 'otherTown').value.trim() : field(player, 'town').value,
+      registeredInPinto: field(player, 'registeredInPinto').value,
+      authorizations: [
+        ['Actividades fuera del pabellón', field(player, 'outings').value],
+        ['Transporte con el equipo', field(player, 'transport').value],
+        ['Publicación de imágenes', field(player, 'images').value],
+      ],
     }));
     const undecided = players.some(player => !player.team);
     const calculated = calculate(players, form.elements.member.checked);
@@ -143,6 +156,12 @@ if (typeof document !== 'undefined') {
       item.textContent = [player.name, player.category.name, player.kit, 'Estampado ' + player.printName,
         !line ? 'Equipo pendiente de confirmar' : line.team === 'national' ? 'Primera Nacional · Exento' :
           euro.format(line.total) + (line.discount ? ' con ' + euro.format(line.discount) + ' de descuento' : '')].join(' · ');
+      const permissions = document.createElement('small');
+      permissions.textContent = player.authorizations.map(([title, choice]) => title + ' ' + choice).join(' · ');
+      item.append(permissions);
+      const residence = document.createElement('small');
+      residence.textContent = player.town + ' · Empadronado en Pinto ' + player.registeredInPinto;
+      item.append(residence);
       if (line && line.total > 0) {
         const payments = payment === 'single'
           ? [{label: 'Pago único', amount: line.total, deadline: season.dates[0]}]
@@ -157,6 +176,21 @@ if (typeof document !== 'undefined') {
           const reference = document.createElement('small');
           reference.textContent = 'Concepto de transferencia ' + concept;
           row.append(reference);
+          if (navigator.clipboard?.writeText) {
+            const copy = document.createElement('button');
+            copy.type = 'button';
+            copy.className = 'copy-concept';
+            copy.textContent = 'Copiar concepto';
+            copy.addEventListener('click', async () => {
+              try {
+                await navigator.clipboard.writeText(concept);
+                copy.textContent = 'Concepto copiado';
+              } catch {
+                copy.textContent = 'Selecciona el texto para copiarlo';
+              }
+            });
+            row.append(copy);
+          }
           table.append(row);
         }
         item.append(table);
@@ -171,6 +205,8 @@ if (typeof document !== 'undefined') {
         euro.format(calculated.lines.reduce((sum,line) => sum + line.payments[index],0)) + ' ' + date).join(' | ');
     document.querySelector('#membership').textContent = !undecided && calculated.laterDiscount
       ? 'Si os hacéis socios después de inscribiros, el descuento orientativo en el alta será de ' + euro.format(calculated.laterDiscount) + '.' : '';
+    document.querySelector('#newsletterSummary').textContent =
+      'Boletines del club · ' + (form.elements.newsletter.checked ? 'Sí' : 'No');
     summary.hidden = false;
     summary.focus();
   };
