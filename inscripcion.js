@@ -15,6 +15,13 @@ function categoryFor(date) {
   if (!date || Number(date.slice(0, 4)) > season.year) return null;
   return season.categories.find(category => Number(date.slice(0, 4)) >= category.minBirth);
 }
+function ageOnDate(birth, today = new Date()) {
+  if (!birth) return null;
+  const [year, month, day] = birth.split('-').map(Number);
+  const beforeBirthday = today.getMonth() + 1 < month ||
+    (today.getMonth() + 1 === month && today.getDate() < day);
+  return today.getFullYear() - year - Number(beforeBirthday);
+}
 function calculate(players, member) {
   const eligible = players.filter(player => player.team !== 'national');
   const siblings = players.length > 1;
@@ -62,11 +69,14 @@ if (typeof document !== 'undefined') {
   function updatePlayer(player) {
     const category = categoryFor(field(player, 'birth').value);
     const birth = field(player, 'birth').value;
-    const minor = Boolean(birth) && birth > (season.year - 18) + '-07-01';
+    const age = ageOnDate(birth);
+    const minor = age !== null && age < 18;
     const noPlayerId = field(player, 'noPlayerId');
     noPlayerId.disabled = !minor;
     if (!minor) noPlayerId.checked = false;
     player.querySelector('.no-player-id').hidden = !minor;
+    const federationIdRequired = age !== null && age >= 14;
+    player.querySelector('.player-id-warning').hidden = !(category?.federated && federationIdRequired && noPlayerId.checked);
     const playerId = field(player, 'playerId');
     playerId.disabled = noPlayerId.checked;
     playerId.required = !noPlayerId.checked;
@@ -97,7 +107,9 @@ if (typeof document !== 'undefined') {
       ['shirt', ['7/8 XS','5/6 XS','3/4 XS',...sizes,'4XL']],
       ['shorts', ['6/5 XS','4/3 XS',...sizes]],
     ]) field(player, name).replaceChildren(new Option('Selecciona', ''), ...options.map(size => new Option(size, size)));
-    field(player, 'birth').max = season.year + '-12-31';
+    const today = new Date();
+    const dateParts = [today.getFullYear(), today.getMonth() + 1, today.getDate()];
+    field(player, 'birth').max = dateParts.map(part => String(part).padStart(2, '0')).join('-');
     player.addEventListener('change', () => updatePlayer(player));
     player.querySelector('.remove').onclick = () => {
       player.remove();
