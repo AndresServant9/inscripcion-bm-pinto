@@ -48,11 +48,39 @@ if (typeof document !== 'undefined') {
     summary.hidden = true;
     form.elements.contact.focus();
   };
-  confirmRegistration.onclick = () => {
-    reviewStatus.textContent = 'Simulación confirmada. Puedes guardar una copia del resumen.';
-    confirmRegistration.hidden = true;
-    printRegistration.hidden = false;
-    printRegistration.focus();
+  const registrationApi = 'https://dfwnzfznhnkcqrdcydnx.supabase.co/rest/v1/rpc/bm_pinto_submit_registration_test';
+  const publishableKey = 'sb_publishable_U3568BhgdgCt7ysDU5l1CA_1CenKkjU';
+  let reviewedRegistration = null;
+  let reviewedPayload = '';
+  let registrationKey = '';
+  let registrationSending = false;
+  confirmRegistration.onclick = async () => {
+    if (!reviewedRegistration || registrationSending) return;
+    const registration = reviewedRegistration;
+    registrationSending = true;
+    confirmRegistration.disabled = true;
+    reviewStatus.textContent = 'Enviando inscripción de prueba…';
+    try {
+      const response = await fetch(registrationApi, {
+        method: 'POST',
+        headers: {apikey: publishableKey, 'Content-Type': 'application/json'},
+        body: JSON.stringify({submission_id: registration.id, submission: registration.data}),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) throw Error('No se pudo enviar la prueba. Puedes reintentar el mismo envío.');
+      const reference = await response.json();
+      if (typeof reference !== 'string' || !reference.startsWith('INS-PRUEBA-')) throw Error('No se pudo comprobar la recepción.');
+      if (reviewedRegistration?.id !== registration.id) return;
+      reviewStatus.textContent = 'Prueba recibida por el club. Referencia ' + reference + '.';
+      confirmRegistration.hidden = true;
+      printRegistration.hidden = false;
+      printRegistration.focus();
+    } catch (error) {
+      if (reviewedRegistration?.id === registration.id) reviewStatus.textContent = error.message;
+    } finally {
+      registrationSending = false;
+      confirmRegistration.disabled = false;
+    }
   };
   printRegistration.onclick = () => window.print();
 
@@ -252,6 +280,21 @@ if (typeof document !== 'undefined') {
     document.querySelector('#membership').textContent = !undecided && calculated.laterDiscount
       ? 'Si os hacéis socios después de inscribiros, el descuento orientativo en el alta será de ' + euro.format(calculated.laterDiscount) + '.' : '';
     reviewStatus.textContent = undecided ? 'El equipo está pendiente de confirmar por el club.' : '';
+    const testData = {
+      payment,
+      member: form.elements.member.checked,
+      total,
+      players: calculated.lines.map(line => ({
+        category: line.category.name, team: line.team, hasKit: line.hasKit,
+        payments: line.payments,
+      })),
+    };
+    const payload = JSON.stringify(testData);
+    if (payload !== reviewedPayload) {
+      reviewedPayload = payload;
+      registrationKey = crypto.randomUUID();
+    }
+    reviewedRegistration = undecided ? null : {id: registrationKey, data: testData};
     confirmRegistration.hidden = undecided;
     printRegistration.hidden = true;
     summary.hidden = false;
