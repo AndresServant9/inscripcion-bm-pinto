@@ -37,13 +37,13 @@ function item(tag, value) {
   return node;
 }
 
-function agreementForm(row, refresh) {
+function agreementForm(row, account, refresh) {
   const form = document.createElement('form');
   const fields = document.createElement('div');
   const feedback = item('p', '');
   feedback.setAttribute('role', 'status');
 
-  function addPayment() {
+  function addPayment(existing) {
     const payment = document.createElement('fieldset');
     const amount = document.createElement('input');
     amount.type = 'number';
@@ -54,6 +54,7 @@ function agreementForm(row, refresh) {
     const due = document.createElement('input');
     due.type = 'date';
     due.required = true;
+    if (existing) { amount.value = existing.amount; due.value = existing.due_on; }
     const remove = item('button', 'Quitar cuota');
     remove.type = 'button';
     remove.onclick = () => payment.remove();
@@ -67,11 +68,52 @@ function agreementForm(row, refresh) {
 
   const add = item('button', 'Añadir cuota');
   add.type = 'button';
-  add.onclick = addPayment;
+  add.onclick = () => addPayment();
   const save = item('button', 'Guardar cuotas');
   save.type = 'submit';
-  form.append(item('h3', 'Configurar cuotas del acuerdo'), fields, add, ' ', save, feedback);
-  addPayment();
+  const demand = item('button', 'Pago a demanda');
+  demand.type = 'button';
+  const record = item('button', 'Registrar ingreso');
+  record.type = 'button';
+  form.append(fields, add, ' ', save, ' ');
+  if (account.mode === 'demand') form.append(record);
+  else form.append(demand);
+  form.append(feedback);
+  const pending = account.installments.filter(payment => payment.status === 'pending');
+  pending.forEach(addPayment);
+  if (!pending.length) addPayment();
+
+  async function update(action, data) {
+    const controls = [...form.querySelectorAll('input, button')];
+    controls.forEach(control => { control.disabled = true; });
+    feedback.textContent = 'Guardando cambios…';
+    try {
+      await rpc('bm_pinto_edit_registration_test_payments', {
+        p_registration_id: row.id, p_action: action, p_data: data, p_expected: account,
+      });
+      if (form.isConnected) refresh();
+    } catch (error) {
+      if (!form.isConnected) return;
+      feedback.textContent = error.code === '40001' ? 'Los pagos han cambiado. Pulsa Actualizar e inténtalo de nuevo.'
+        : 'No se pudo guardar. Revisa los importes y vencimientos.';
+      controls.forEach(control => { control.disabled = false; });
+    }
+  }
+
+  demand.onclick = () => {
+    if (window.confirm('¿Pasar el saldo pendiente a pago a demanda, sin vencimientos fijos?')) update('demand', {});
+  };
+  record.disabled = account.pending <= 0;
+  record.onclick = () => {
+    const input = window.prompt('Importe del ingreso comprobado (€)');
+    if (input === null) return;
+    const amount = input.trim().replace(',', '.');
+    if (!/^[0-9]+([.][0-9]{1,2})?$/.test(amount) || Number(amount) <= 0 || Number(amount) > account.pending) {
+      feedback.textContent = 'Introduce un importe positivo que no supere el saldo pendiente.';
+      return;
+    }
+    update('record', { amount });
+  };
 
   form.onsubmit = async event => {
     event.preventDefault();
@@ -83,25 +125,7 @@ function agreementForm(row, refresh) {
       feedback.textContent = 'Añade al menos una cuota.';
       return;
     }
-    const controls = [...form.querySelectorAll('input, button')];
-    controls.forEach(control => { control.disabled = true; });
-    feedback.textContent = 'Guardando cuotas…';
-    try {
-      await rpc('bm_pinto_configure_registration_test_agreement', {
-        p_registration_id: row.id, p_payments: payments,
-      });
-      if (form.isConnected) refresh();
-    } catch (error) {
-      if (!form.isConnected) return;
-      if (error.code === '23505') {
-        refresh();
-        return;
-      }
-      feedback.textContent = error.code === 'PGRST202'
-        ? 'Ejecuta el SQL 27 en Supabase para habilitar esta opción.'
-        : 'No se pudieron guardar las cuotas. Revisa los importes y vencimientos.';
-      controls.forEach(control => { control.disabled = false; });
-    }
+    await update('schedule', payments);
   };
   return form;
 }
@@ -123,13 +147,12 @@ function render() {
       try {
         const account = await rpc('bm_pinto_registration_test_payments', { p_registration_id: row.id });
         status.textContent = account.agreement_pending ? 'Acuerdo pendiente de concretar' :
-          [account.mode === 'agreement' ? 'Acuerdo de pago con el club' : account.mode === 'single' ? 'Pago único' : 'Pago fraccionado',
+          [account.mode === 'demand' ? 'Pago a demanda' : account.mode === 'agreement' ? 'Acuerdo de pago con el club' : account.mode === 'single' ? 'Pago único' : 'Pago fraccionado',
             'Total ' + money.format(account.total), 'Confirmado ' + money.format(account.confirmed),
             'En revisión ' + money.format(account.in_review), 'Pendiente ' + money.format(account.pending)].join(' · ');
         const installments = document.createElement('ul');
         for (const payment of account.installments) {
-          const line = item('li', 'Cuota ' + payment.installment + ' · ' +
-            payment.due_on.split('-').reverse().join('/') + ' · ' +
+          const line = item('li', (payment.due_on ? 'Cuota ' + payment.installment + ' · ' + payment.due_on.split('-').reverse().join('/') : 'Ingreso sin vencimiento · ' + date.format(new Date(payment.confirmed_at))) + ' · ' +
             money.format(payment.amount) + ' · ' + statuses[payment.status]);
           if (payment.status === 'pending' || payment.status === 'in_review') {
             const button = item('button', 'Confirmar ingreso');
@@ -140,13 +163,14 @@ function render() {
               try {
                 await rpc('bm_pinto_confirm_registration_test_payment', {
                   p_registration_id: row.id,
-                  p_schedule: account.mode === 'agreement' ? 'agreement' : 'standard',
+                  p_schedule: payment.schedule,
                   p_installment: payment.installment,
                 });
                 if (!details.isConnected) return;
                 status.remove();
                 installments.remove();
                 details.querySelector(':scope > button')?.remove();
+                details.querySelector(':scope > details')?.remove();
                 details.dispatchEvent(new Event('toggle'));
                 get('status').textContent = 'Ingreso confirmado.';
               } catch {
@@ -160,13 +184,15 @@ function render() {
           installments.append(line);
         }
         details.append(installments);
-        if (account.agreement_pending) {
-          details.append(agreementForm(row, () => {
+        {
+          const editor = document.createElement('details');
+          editor.append(item('summary', 'Modificar cuotas'), agreementForm(row, account, () => {
             details.replaceChildren(details.querySelector('summary'));
             if (details.open) details.dispatchEvent(new Event('toggle'));
           }));
+          details.append(editor);
         }
-        if (account.mode !== 'agreement' && account.confirmed === 0 && account.in_review === 0 && account.pending > 0) {
+        if (!['agreement', 'demand'].includes(account.mode) && account.confirmed === 0 && account.in_review === 0 && account.pending > 0) {
           const agreement = item('button', 'Activar acuerdo de pago con el club');
           agreement.type = 'button';
           agreement.addEventListener('click', async () => {
@@ -178,6 +204,7 @@ function render() {
               status.remove();
               installments.remove();
               agreement.remove();
+              details.querySelector(':scope > details')?.remove();
               details.dispatchEvent(new Event('toggle'));
               get('status').textContent = 'Acuerdo activado.';
             } catch (error) {
@@ -272,6 +299,8 @@ get('logout').addEventListener('click', () => {
   get('panel').hidden = true;
   get('login').hidden = false;
 });
+
+
 
 
 
