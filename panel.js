@@ -58,9 +58,37 @@ function render() {
             'Total ' + money.format(account.total), 'Confirmado ' + money.format(account.confirmed),
             'En revisión ' + money.format(account.in_review), 'Pendiente ' + money.format(account.pending)].join(' · ');
         const installments = document.createElement('ul');
-        installments.append(...account.installments.map(payment => item('li',
-          'Cuota ' + payment.installment + ' · ' + payment.due_on.split('-').reverse().join('/') +
-          ' · ' + money.format(payment.amount) + ' · ' + statuses[payment.status])));
+        for (const payment of account.installments) {
+          const line = item('li', 'Cuota ' + payment.installment + ' · ' +
+            payment.due_on.split('-').reverse().join('/') + ' · ' +
+            money.format(payment.amount) + ' · ' + statuses[payment.status]);
+          if (payment.status === 'pending' || payment.status === 'in_review') {
+            const button = item('button', 'Confirmar ingreso');
+            button.type = 'button';
+            button.addEventListener('click', async () => {
+              if (!window.confirm('¿Has comprobado el ingreso de ' + money.format(payment.amount) + '?')) return;
+              button.disabled = true;
+              try {
+                await rpc('bm_pinto_confirm_registration_test_payment', {
+                  p_registration_id: row.id,
+                  p_schedule: account.mode === 'agreement' ? 'agreement' : 'standard',
+                  p_installment: payment.installment,
+                });
+                if (!details.isConnected) return;
+                status.remove();
+                installments.remove();
+                details.dispatchEvent(new Event('toggle'));
+                get('status').textContent = 'Ingreso confirmado.';
+              } catch {
+                if (!details.isConnected) return;
+                get('status').textContent = 'No se pudo confirmar el ingreso. Comprueba que se ha ejecutado el SQL 25.';
+                button.disabled = false;
+              }
+            });
+            line.append(' ', button);
+          }
+          installments.append(line);
+        }
         details.append(installments);
       } catch {
         status.remove();
@@ -144,5 +172,6 @@ get('logout').addEventListener('click', () => {
   get('panel').hidden = true;
   get('login').hidden = false;
 });
+
 
 
