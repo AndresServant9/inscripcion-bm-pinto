@@ -12,7 +12,12 @@ async function request(path, body) {
   const headers = { apikey: apiKey, 'Content-Type': 'application/json' };
   if (token) headers.Authorization = 'Bearer ' + token;
   const response = await fetch(base + path, { method: 'POST', headers, body: JSON.stringify(body) });
-  if (!response.ok) throw new Error('Solicitud rechazada');
+  if (!response.ok) {
+    const error = new Error('Solicitud rechazada');
+    error.status = response.status;
+    error.code = (await response.json().catch(() => ({}))).code;
+    throw error;
+  }
   return response.json();
 }
 
@@ -88,18 +93,30 @@ get('login').addEventListener('submit', async event => {
   button.disabled = true;
   const data = new FormData(form);
   get('status').textContent = 'Comprobando el acceso…';
+  let authenticated = false;
   try {
     const session = await request('/auth/v1/token?grant_type=password', {
       email: data.get('email').trim(), password: data.get('password'),
     });
     token = session.access_token;
+    authenticated = true;
     await load();
     form.hidden = true;
     get('panel').hidden = false;
     get('status').textContent = '';
-  } catch {
+  } catch (error) {
     token = '';
-    get('status').textContent = 'No se pudo acceder. Comprueba el correo y la contraseña de una cuenta administradora del club.';
+    let message = 'No se pudo conectar con Supabase. Inténtalo de nuevo.';
+    if (authenticated && error.code === '42501') {
+      message = 'La cuenta ha iniciado sesión, pero no tiene acceso de administrador del club.';
+    } else if (authenticated && (error.code === 'PGRST202' || error.status === 404)) {
+      message = 'Falta instalar la consulta del panel. Ejecuta el SQL 23 en Supabase.';
+    } else if (authenticated) {
+      message = 'La cuenta ha iniciado sesión, pero no se pudieron cargar las inscripciones.';
+    } else if (error.status === 400 || error.status === 401) {
+      message = 'Supabase ha rechazado el inicio de sesión. Comprueba el correo y la contraseña de la cuenta del club.';
+    }
+    get('status').textContent = message;
   } finally {
     form.elements.password.value = '';
     button.disabled = false;
@@ -127,4 +144,5 @@ get('logout').addEventListener('click', () => {
   get('panel').hidden = true;
   get('login').hidden = false;
 });
+
 
