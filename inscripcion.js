@@ -197,6 +197,7 @@ if (typeof document !== 'undefined') {
     const players = [...container.children].map(player => ({
       name: field(player, 'playerName').value.trim(),
       category: categoryFor(field(player, 'birth').value),
+      division: field(player, 'division').value,
       team: field(player, 'team').disabled ? 'standard' : field(player, 'team').value,
       hasKit: field(player, 'hasKit').value === 'yes',
       kit: field(player, 'hasKit').value === 'yes' ? 'Ya tiene el pack inicial' : field(player, 'fitted').checked ? 'Tallas tomadas en el club' :
@@ -285,7 +286,7 @@ if (typeof document !== 'undefined') {
       member: form.elements.member.checked,
       total,
       players: calculated.lines.map(line => ({
-        category: line.category.name, team: line.team, hasKit: line.hasKit,
+        category: line.category.name, team: line.team, division: line.division, hasKit: line.hasKit,
         payments: line.payments,
       })),
     };

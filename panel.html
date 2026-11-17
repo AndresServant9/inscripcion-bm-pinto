@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inscripciones de prueba · Club Balonmano Pinto</title>
+<style>
+  body { font: 16px system-ui, sans-serif; background: #f4f2ee; color: #222; margin: 0; }
+  main { max-width: 58rem; margin: auto; padding: 1.25rem; }
+  header, section, form { padding: 1.25rem; border-radius: .75rem; background: white; margin-bottom: 1rem; }
+  header { background: #222; color: white; }
+  h1 { margin: 0; }
+  label { display: inline-grid; gap: .35rem; margin: 0 .75rem .75rem 0; }
+  input, select, button { font: inherit; padding: .55rem; max-width: 100%; }
+  button { background: #b50832; color: white; border: 0; border-radius: .35rem; cursor: pointer; }
+  li { margin-block: .5rem; overflow-wrap: anywhere; }
+</style>
+<main>
+  <header><div>Club Balonmano Pinto</div><h1>Inscripciones de prueba</h1></header>
+  <form id="login">
+    <label>Correo <input type="email" name="email" autocomplete="username" required></label>
+    <label>Contraseña <input type="password" name="password" autocomplete="current-password" required></label>
+    <button>Entrar</button>
+  </form>
+  <p id="status" role="status"></p>
+  <section id="panel" hidden>
+    <label>Equipo <select id="team"><option value="">Todos los equipos</option></select></label>
+    <label>Referencia <input id="reference" type="search"></label>
+    <button id="refresh" type="button">Actualizar</button>
+    <button id="logout" type="button">Cerrar sesión</button>
+    <p id="count" aria-live="polite"></p>
+    <ul id="registrations"></ul>
+  </section>
+</main>
+<script src="panel.js" defer></script>
+</html>
