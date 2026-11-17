@@ -77,6 +77,7 @@ function render() {
                 if (!details.isConnected) return;
                 status.remove();
                 installments.remove();
+                details.querySelector(':scope > button')?.remove();
                 details.dispatchEvent(new Event('toggle'));
                 get('status').textContent = 'Ingreso confirmado.';
               } catch {
@@ -90,6 +91,30 @@ function render() {
           installments.append(line);
         }
         details.append(installments);
+        if (account.mode !== 'agreement' && account.confirmed === 0 && account.in_review === 0 && account.pending > 0) {
+          const agreement = item('button', 'Activar acuerdo de pago con el club');
+          agreement.type = 'button';
+          agreement.addEventListener('click', async () => {
+            if (!window.confirm('¿Dejar el calendario estándar en pausa hasta concretar el acuerdo?')) return;
+            agreement.disabled = true;
+            try {
+              await rpc('bm_pinto_activate_registration_test_agreement', { p_registration_id: row.id });
+              if (!details.isConnected) return;
+              status.remove();
+              installments.remove();
+              agreement.remove();
+              details.dispatchEvent(new Event('toggle'));
+              get('status').textContent = 'Acuerdo activado.';
+            } catch (error) {
+              if (!details.isConnected) return;
+              get('status').textContent = error.code === '23514'
+                ? 'La inscripción ya tiene pagos registrados. Actualiza el panel.'
+                : 'No se pudo activar el acuerdo.';
+              agreement.disabled = false;
+            }
+          });
+          details.append(agreement);
+        }
       } catch {
         status.remove();
         get('status').textContent = 'No se pudieron consultar las cuotas. Cierra y vuelve a abrir el desglose para reintentar.';
@@ -172,6 +197,7 @@ get('logout').addEventListener('click', () => {
   get('panel').hidden = true;
   get('login').hidden = false;
 });
+
 
 
 
