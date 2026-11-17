@@ -29,6 +29,7 @@ function calculate(players, member) {
     const exempt = player.team === 'national';
     const discount = exempt ? 0 : (siblings ? 10 : 0) + (member ? 10 : 0);
     const payments = exempt ? [0,0,0] : [...player.category.installments];
+    if (player.hasKit) payments[0] = 0;
     payments[2] -= discount;
     return {...player, discount, payments, total: payments.reduce((sum, value) => sum + value, 0)};
   });
@@ -39,6 +40,22 @@ if (typeof document !== 'undefined') {
   const form = document.querySelector('#registration');
   const container = document.querySelector('#players');
   const summary = document.querySelector('#summary');
+  const reviewStatus = document.querySelector('#reviewStatus');
+  const confirmRegistration = document.querySelector('#confirmRegistration');
+  const printRegistration = document.querySelector('#printRegistration');
+
+  document.querySelector('#editRegistration').onclick = () => {
+    summary.hidden = true;
+    form.elements.contact.focus();
+  };
+  confirmRegistration.onclick = () => {
+    reviewStatus.textContent = 'Simulación confirmada. Puedes guardar una copia del resumen.';
+    confirmRegistration.hidden = true;
+    printRegistration.hidden = false;
+    printRegistration.focus();
+  };
+  printRegistration.onclick = () => window.print();
+
   const authorizationDetails = document.querySelector('#authorizationDetails');
   const privacyDetails = document.querySelector('#privacyDetails');
   for (const button of document.querySelectorAll('[data-privacy]')) {
@@ -106,6 +123,8 @@ if (typeof document !== 'undefined') {
     field(player, 'team').disabled = !seniorMale;
     player.querySelector('.senior').hidden = !seniorMale;
     player.querySelector('.category').textContent = category?.name || '';
+    player.querySelector('.trouser-label').textContent = field(player, 'kitRole').value === 'goalkeeper'
+      ? 'Talla de pantalón largo' : 'Talla de pantalón';
     const protocol = player.querySelector('.protocol');
     protocol.hidden = !category;
     if (category) {
@@ -113,8 +132,13 @@ if (typeof document !== 'undefined') {
       link.dataset.authorization = category.federated ? 'federatedProtocol' : 'nonFederatedProtocol';
       link.textContent = category.federated ? 'Protocolo de accidentes para federados' : 'Protocolo de accidentes para no federados';
     }
-    for (const name of ['shirt','shorts']) {
-      field(player, name).disabled = field(player, 'fitted').checked;
+    const needsKit = field(player, 'hasKit').value === 'no';
+    player.querySelector('.kit-fields').hidden = !needsKit;
+    for (const name of ['kitRole', 'printName', 'fitted']) {
+      field(player, name).disabled = !needsKit;
+    }
+    for (const name of ['shirt', 'shorts']) {
+      field(player, name).disabled = !needsKit || field(player, 'fitted').checked;
     }
   }
   function addPlayer() {
@@ -133,6 +157,7 @@ if (typeof document !== 'undefined') {
       summary.hidden = true;
     };
     container.append(player);
+    updatePlayer(player);
     renumber();
     return field(player, 'playerName');
   }
@@ -145,9 +170,11 @@ if (typeof document !== 'undefined') {
       name: field(player, 'playerName').value.trim(),
       category: categoryFor(field(player, 'birth').value),
       team: field(player, 'team').disabled ? 'standard' : field(player, 'team').value,
-      kit: field(player, 'fitted').checked ? 'Tallas tomadas en el club' :
+      hasKit: field(player, 'hasKit').value === 'yes',
+      kit: field(player, 'hasKit').value === 'yes' ? 'Ya tiene el pack inicial' : field(player, 'fitted').checked ? 'Tallas tomadas en el club' :
         'Camiseta ' + field(player, 'shirt').value + ' · Pantalón ' + field(player, 'shorts').value,
       printName: field(player, 'printName').value.trim(),
+      kitRole: field(player, 'kitRole').value,
       town: field(player, 'town').value === 'other' ? field(player, 'otherTown').value.trim() : field(player, 'town').value,
       registeredInPinto: field(player, 'registeredInPinto').value,
       authorizations: [
@@ -163,9 +190,15 @@ if (typeof document !== 'undefined') {
     list.replaceChildren(...players.map((player, index) => {
       const item = document.createElement('li');
       const line = player.team ? calculated.lines[index] : null;
-      item.textContent = [player.name, player.category.name, player.kit, 'Estampado ' + player.printName,
+      item.textContent = [player.name, player.category.name, player.kit, player.hasKit ? '' : 'Estampado ' + player.printName,
         !line ? 'Equipo pendiente de confirmar' : line.team === 'national' ? 'Primera Nacional · Exento' :
-          euro.format(line.total) + (line.discount ? ' con ' + euro.format(line.discount) + ' de descuento' : '')].join(' · ');
+          euro.format(line.total) + (line.discount ? ' con ' + euro.format(line.discount) + ' de descuento' : '')].filter(Boolean).join(' · ');
+      const kitContents = document.createElement('small');
+      const garments = player.kitRole === 'goalkeeper'
+        ? 'Primera y segunda camiseta de juego y pantalón largo'
+        : 'Camiseta roja de primera equipación, camiseta de segunda equipación y pantalón corto de juego';
+      kitContents.textContent = 'Pack inicial · ' + garments + ' · Incluye ropa de calentamiento';
+      if (!player.hasKit) item.append(kitContents);
       const permissions = document.createElement('small');
       permissions.textContent = player.authorizations.map(([title, choice]) => title + ' ' + choice).join(' · ');
       item.append(permissions);
@@ -179,7 +212,7 @@ if (typeof document !== 'undefined') {
               label: 'Pago ' + (index + 1), amount, deadline: season.dates[index],
             }));
         const table = document.createElement('ul');
-        for (const {label, amount, deadline} of payments) {
+        for (const {label, amount, deadline} of payments.filter(entry => entry.amount > 0)) {
           const row = document.createElement('li');
           const concept = [label, player.name, player.category.name].join(' ').toLocaleUpperCase('es-ES');
           row.textContent = label + ' · ' + euro.format(amount) + ' ' + deadline;
@@ -208,13 +241,19 @@ if (typeof document !== 'undefined') {
       return item;
     }));
     const total = calculated.lines.reduce((sum, line) => sum + line.total, 0);
+    const familyPayments = season.dates.map((date, index) => ({
+      date, number: index + 1,
+      amount: calculated.lines.reduce((sum, line) => sum + line.payments[index], 0),
+    }));
     document.querySelector('#total').textContent = undecided ? 'Total pendiente de confirmar el equipo' : 'Total familiar ' + euro.format(total);
     document.querySelector('#schedule').textContent = undecided ? '' : payment === 'single'
       ? 'Pago único de ' + euro.format(total) + ' ' + season.dates[0] + '.'
-      : season.dates.map((date,index) => 'Pago ' + (index+1) + ' · ' +
-        euro.format(calculated.lines.reduce((sum,line) => sum + line.payments[index],0)) + ' ' + date).join(' | ');
+      : familyPayments.filter(({amount}) => amount > 0).map(({date, number, amount}) => 'Pago ' + number + ' · ' + euro.format(amount) + ' ' + date).join(' | ');
     document.querySelector('#membership').textContent = !undecided && calculated.laterDiscount
       ? 'Si os hacéis socios después de inscribiros, el descuento orientativo en el alta será de ' + euro.format(calculated.laterDiscount) + '.' : '';
+    reviewStatus.textContent = undecided ? 'El equipo está pendiente de confirmar por el club.' : '';
+    confirmRegistration.hidden = undecided;
+    printRegistration.hidden = true;
     summary.hidden = false;
     summary.focus();
   };
