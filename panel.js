@@ -37,6 +37,75 @@ function item(tag, value) {
   return node;
 }
 
+function agreementForm(row, refresh) {
+  const form = document.createElement('form');
+  const fields = document.createElement('div');
+  const feedback = item('p', '');
+  feedback.setAttribute('role', 'status');
+
+  function addPayment() {
+    const payment = document.createElement('fieldset');
+    const amount = document.createElement('input');
+    amount.type = 'number';
+    amount.min = '0.01';
+    amount.max = '999999.99';
+    amount.step = '0.01';
+    amount.required = true;
+    const due = document.createElement('input');
+    due.type = 'date';
+    due.required = true;
+    const remove = item('button', 'Quitar cuota');
+    remove.type = 'button';
+    remove.onclick = () => payment.remove();
+    const amountLabel = item('label', 'Importe (€)');
+    const dueLabel = item('label', 'Vencimiento');
+    amountLabel.append(amount);
+    dueLabel.append(due);
+    payment.append(amountLabel, dueLabel, remove);
+    fields.append(payment);
+  }
+
+  const add = item('button', 'Añadir cuota');
+  add.type = 'button';
+  add.onclick = addPayment;
+  const save = item('button', 'Guardar cuotas');
+  save.type = 'submit';
+  form.append(item('h3', 'Configurar cuotas del acuerdo'), fields, add, ' ', save, feedback);
+  addPayment();
+
+  form.onsubmit = async event => {
+    event.preventDefault();
+    const payments = Array.from(fields.children, payment => ({
+      amount: payment.querySelector('input[type=number]').valueAsNumber,
+      due_on: payment.querySelector('input[type=date]').value,
+    }));
+    if (!payments.length) {
+      feedback.textContent = 'Añade al menos una cuota.';
+      return;
+    }
+    const controls = [...form.querySelectorAll('input, button')];
+    controls.forEach(control => { control.disabled = true; });
+    feedback.textContent = 'Guardando cuotas…';
+    try {
+      await rpc('bm_pinto_configure_registration_test_agreement', {
+        p_registration_id: row.id, p_payments: payments,
+      });
+      if (form.isConnected) refresh();
+    } catch (error) {
+      if (!form.isConnected) return;
+      if (error.code === '23505') {
+        refresh();
+        return;
+      }
+      feedback.textContent = error.code === 'PGRST202'
+        ? 'Ejecuta el SQL 27 en Supabase para habilitar esta opción.'
+        : 'No se pudieron guardar las cuotas. Revisa los importes y vencimientos.';
+      controls.forEach(control => { control.disabled = false; });
+    }
+  };
+  return form;
+}
+
 function render() {
   const query = get('reference').value.trim().toLowerCase();
   const team = get('team').value;
@@ -91,6 +160,12 @@ function render() {
           installments.append(line);
         }
         details.append(installments);
+        if (account.agreement_pending) {
+          details.append(agreementForm(row, () => {
+            details.replaceChildren(details.querySelector('summary'));
+            if (details.open) details.dispatchEvent(new Event('toggle'));
+          }));
+        }
         if (account.mode !== 'agreement' && account.confirmed === 0 && account.in_review === 0 && account.pending > 0) {
           const agreement = item('button', 'Activar acuerdo de pago con el club');
           agreement.type = 'button';
