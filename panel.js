@@ -76,7 +76,16 @@ function agreementForm(row, account, refresh) {
   const record = item('button', 'Registrar ingreso');
   record.type = 'button';
   form.append(fields, add, ' ', save, ' ');
-  if (account.mode === 'demand') form.append(record);
+  const income = document.createElement('input');
+  income.type = 'text';
+  income.inputMode = 'decimal';
+  const incomeLabel = item('label', 'Importe del ingreso (€)');
+  incomeLabel.append(income);
+  if (account.mode === 'demand') {
+    const incomeFields = document.createElement('fieldset');
+    incomeFields.append(item('legend', 'Pago a demanda'), incomeLabel, record);
+    form.append(incomeFields);
+  }
   else form.append(demand);
   form.append(feedback);
   const pending = account.installments.filter(payment => payment.status === 'pending');
@@ -91,7 +100,10 @@ function agreementForm(row, account, refresh) {
       await rpc('bm_pinto_edit_registration_test_payments', {
         p_registration_id: row.id, p_action: action, p_data: data, p_expected: account,
       });
-      if (form.isConnected) refresh();
+      if (form.isConnected) {
+        get('status').textContent = action === 'record' ? 'Ingreso registrado y descontado del saldo pendiente.' : 'Cuotas actualizadas.';
+        refresh();
+      }
     } catch (error) {
       if (!form.isConnected) return;
       feedback.textContent = error.code === '40001' ? 'Los pagos han cambiado. Pulsa Actualizar e inténtalo de nuevo.'
@@ -103,11 +115,9 @@ function agreementForm(row, account, refresh) {
   demand.onclick = () => {
     if (window.confirm('¿Pasar el saldo pendiente a pago a demanda, sin vencimientos fijos?')) update('demand', {});
   };
-  record.disabled = account.pending <= 0;
+  record.disabled = income.disabled = account.pending <= 0;
   record.onclick = () => {
-    const input = window.prompt('Importe del ingreso comprobado (€)');
-    if (input === null) return;
-    const amount = input.trim().replace(',', '.');
+    const amount = income.value.trim().replace(',', '.');
     if (!/^[0-9]+([.][0-9]{1,2})?$/.test(amount) || Number(amount) <= 0 || Number(amount) > account.pending) {
       feedback.textContent = 'Introduce un importe positivo que no supere el saldo pendiente.';
       return;
@@ -115,6 +125,11 @@ function agreementForm(row, account, refresh) {
     update('record', { amount });
   };
 
+  income.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    record.click();
+  });
   form.onsubmit = async event => {
     event.preventDefault();
     const payments = Array.from(fields.children, payment => ({
@@ -180,6 +195,32 @@ function render() {
               }
             });
             line.append(' ', button);
+          }
+          if (payment.status === 'in_review' || payment.receipt_received_at) {
+            const download = item('button', 'Descargar justificante');
+            download.type = 'button';
+            download.onclick = async () => {
+              download.disabled = true;
+              try {
+                const receipt = await rpc('bm_pinto_download_registration_test_receipt', {
+                  p_id: row.id, p_schedule: payment.schedule, p_installment: payment.installment,
+                });
+                if (!receipt) throw new Error('Archivo no disponible');
+                if (!details.isConnected) return;
+                const bytes = Uint8Array.from(atob(receipt.file), char => char.charCodeAt(0));
+                const url = URL.createObjectURL(new Blob([bytes], { type: receipt.mime }));
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'justificante.' + { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' }[receipt.mime];
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              } catch {
+                if (details.isConnected) get('status').textContent = 'No se pudo descargar el justificante.';
+              } finally {
+                download.disabled = false;
+              }
+            };
+            line.append(' ', download);
           }
           installments.append(line);
         }
@@ -299,6 +340,7 @@ get('logout').addEventListener('click', () => {
   get('panel').hidden = true;
   get('login').hidden = false;
 });
+
 
 
 
