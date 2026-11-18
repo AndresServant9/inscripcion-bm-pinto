@@ -4,48 +4,173 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inscripciones de prueba · Club Balonmano Pinto</title>
 <style>
-  body { font: 16px system-ui, sans-serif; background: #f4f2ee; color: #222; margin: 0; }
-  main { max-width: 58rem; margin: auto; padding: 1.25rem; }
-  header, section, form { padding: 1.25rem; border-radius: .75rem; background: white; margin-bottom: 1rem; }
-  header { background: #222; color: white; }
-  h1 { margin: 0; }
-  label { display: inline-grid; gap: .35rem; margin: 0 .75rem .75rem 0; }
-  input, select, button { font: inherit; padding: .55rem; max-width: 100%; }
-  button { background: #b50832; color: white; border: 0; border-radius: .35rem; cursor: pointer; }
-  li { margin-block: .5rem; overflow-wrap: anywhere; }
+  * { box-sizing: border-box; }
+  body { font: 1rem/1.5 system-ui, sans-serif; background: #f4f2ee; color: #242424; margin: 0; }
+  main { max-width: 76rem; margin: auto; padding: clamp(.85rem, 3vw, 2rem); }
+  header, .surface { padding: clamp(1rem, 3vw, 1.6rem); border-radius: 1rem; margin-bottom: 1rem; }
+  header { display: flex; align-items: center; gap: 1rem; background: #242424; color: white; }
+  header img { width: clamp(2.6rem, 8vw, 4.25rem); height: auto; }
+  header p { margin: 0; color: #f4df65; font-size: .9rem; }
+  h1, h2 { margin: 0; line-height: 1.2; }
+  h1 { font-size: clamp(1.45rem, 4vw, 2.25rem); }
+  h2 { font-size: 1.2rem; }
+  .surface { background: white; border: 1px solid #e4e0da; }
+  .section-heading, .actions, .inline-fields {
+    display: flex; gap: .65rem; flex-wrap: wrap; align-items: center;
+  }
+  .section-heading { justify-content: space-between; margin-bottom: 1rem; }
+  .inline-fields { align-items: end; }
+  .inline-fields label { flex: 1 1 11rem; }
+  .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13.5rem), 1fr)); gap: .85rem; }
+  label { display: grid; grid-template-rows: 1fr auto; gap: .35rem; min-width: 0; font-size: .88rem; font-weight: 650; }
+  .delete-confirmation { display: flex; align-items: center; margin: .6rem 0; }
+  .delete-confirmation input { width: auto; min-height: auto; }
+  input, select, textarea, button { font: inherit; max-width: 100%; border-radius: .55rem; }
+  input, select, textarea { width: 100%; min-width: 0; min-height: 2.75rem; padding: .48rem .65rem; border: 1px solid #aaa49e; background: white; color: inherit; }
+  button { min-height: 2.75rem; padding: .48rem .8rem; background: #a60832; color: white; border: 1px solid transparent; font-weight: 650; cursor: pointer; }
+  button.secondary { background: white; border-color: #b9b4ad; color: #242424; }
+  .exports { margin: 0; min-width: min(100%, 13rem); }
+  .exports > summary { padding: .55rem .8rem; border: 1px solid #b9b4ad; border-radius: .55rem; }
+  .export-options { display: grid; gap: .45rem; margin-top: .5rem; }
+  .export-options button { text-align: left; }
+  #kitExportSummary { color: #534d47; font-size: .85rem; margin: 0; }
+  button:disabled, select:disabled { opacity: .52; cursor: default; }
+  :focus-visible { outline: 2px solid #a60832; outline-offset: 3px; }
+  .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .85rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e4e0da; }
+  .results { margin-top: 1.25rem; }
+  #count { margin: 0; font-weight: 700; }
+  #filteredPaymentTotals { color: #534d47; margin: .35rem 0; }
+  p[role="status"]:empty, ul:empty, #filteredPaymentTotals:empty { display: none; }
+  #registrations { list-style: none; padding: 0; margin: .85rem 0 0; }
+  #registrations > li { padding: 1rem; border: 1px solid #e4e0da; border-radius: .75rem; background: #faf9f7; margin: .65rem 0; }
+  .registration-players { list-style: none; padding: 0; margin: 0 0 .5rem; }
+  .registration-players li { display: flex; flex-wrap: wrap; align-items: baseline; gap: .15rem .65rem; }
+  .registration-players li + li { margin-top: .35rem; }
+  .registration-players span { font-size: .9rem; color: #534d47; }
+  .registration-kit { flex-basis: 100%; color: #534d47; }
+  li { overflow-wrap: anywhere; }
+  #registrations p { margin: .45rem 0; }
+  details { margin-block: .55rem; }
+  summary { cursor: pointer; font-weight: 650; }
+  .payment-row { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin: .5rem 0; }
+  .payment-row > span { flex: 1 1 15rem; }
+  .payment-row > details { flex-basis: 100%; }
+  #registrations fieldset { display: flex; flex-wrap: wrap; align-items: end; gap: .65rem; min-width: 0; border: 1px solid #e4e0da; border-radius: .55rem; margin: .6rem 0; }
+  #reminders > summary { font-size: 1.15rem; }
+  #reminderPreview { margin-block: 1rem; }
+  .scheduled { border-top: 1px solid #e4e0da; padding-top: 1rem; margin-top: 1rem; }
+  [hidden] { display: none !important; }
 </style>
 <main>
-  <header><div>Club Balonmano Pinto</div><h1>Inscripciones de prueba</h1></header>
-  <form id="login">
+  <header><img src="escudo.png" alt=""><div><p>Club Balonmano Pinto</p><h1>Inscripciones de prueba</h1></div></header>
+  <form id="login" class="surface inline-fields">
     <label>Correo <input type="email" name="email" autocomplete="username" required></label>
     <label>Contraseña <input type="password" name="password" autocomplete="current-password" required></label>
     <button>Entrar</button>
   </form>
   <p id="status" role="status"></p>
   <section id="panel" hidden>
+    <section class="surface" aria-labelledby="filterHeading">
+    <div class="section-heading"><h2 id="filterHeading">Buscar inscripciones</h2>
+      <button id="logout" class="secondary" type="button">Cerrar sesión</button>
+    </div>
+    <div class="filter-grid">
     <label>Equipo <select id="team"><option value="">Todos los equipos</option></select></label>
-    <label>Referencia <input id="reference" type="search"></label>
+    <label>Categoría <select id="categoryFilter"><option value="">Todas las categorías</option></select></label>
+    <label>Pack inicial <select id="kitFilter">
+      <option value="">Todos los jugadores</option>
+      <option value="needed">Necesita el pack</option>
+      <option value="owned">Ya tiene el pack</option>
+    </select></label>
+    <label>Estado del pago <select id="paymentState">
+      <option value="">Todos los estados</option>
+      <option value="pending">Con saldo pendiente</option>
+      <option value="in_review">Con pagos en revisión</option>
+      <option value="confirmed">Con pagos confirmados</option>
+      <option value="settled">Liquidado</option>
+      <option value="agreement_pending">Acuerdo pendiente de concretar</option>
+    </select></label>
+    <label>Jugador, referencia o correo <input id="reference" type="search"></label>
+    <label>Cuenta familiar <select id="accountFilter">
+      <option value="">Todas</option>
+      <option value="linked">Vinculadas</option>
+      <option value="unlinked">Sin vincular</option>
+    </select></label>
+    <label>Modalidad de pago <select id="paymentMode">
+      <option value="">Todas las modalidades</option>
+      <option value="single">Pago único</option>
+      <option value="split">Pago fraccionado</option>
+      <option value="agreement">Acuerdo con el club</option>
+      <option value="demand">Pago a demanda</option>
+    </select></label>
+    <label>Inscripciones desde <input id="registrationFrom" type="date"></label>
+    <label>Vencimiento de cuotas pendientes <select id="dueFilter">
+      <option value="">Cualquier vencimiento</option>
+      <option value="overdue">Vencidas</option>
+      <option value="next7">Hasta 7 días</option>
+    </select></label>
+    <label>Inscripciones hasta <input id="registrationUntil" type="date"></label>
+    </div>
+    <div class="toolbar">
+    <div class="actions">
+    <button id="clearRegistrationFilters" class="secondary" type="button">Limpiar filtros</button>
     <button id="refresh" type="button">Actualizar</button>
-    <button id="logout" type="button">Cerrar sesión</button>
+    </div>
+    <details class="exports">
+      <summary>Exportar a Excel</summary>
+      <div class="export-options">
+        <button id="exportRegistrations" class="secondary" type="button" disabled>Resumen por inscripción</button>
+        <button id="exportInstallments" class="secondary" type="button" disabled>Detalle por cuota</button>
+        <button id="exportPlayers" class="secondary" type="button" disabled>Listado por jugador</button>
+        <button id="exportKits" class="secondary" type="button" disabled>Packs iniciales de ropa (.xlsx)</button>
+        <p id="kitExportSummary"></p>
+      </div>
+    </details>
+    </div>
+    <div class="results">
     <p id="count" aria-live="polite"></p>
+    <p id="filteredPaymentTotals"></p>
     <ul id="registrations"></ul>
-    <details>
+    </div>
+    </section>
+    <details class="surface">
+      <summary>Descuento de prueba por alta de socio</summary>
+      <p>Consulta el descuento previsto para el correo verificado de la cuenta familiar.</p>
+      <form id="membershipRedemption" class="inline-fields">
+        <label>Correo de la cuenta familiar <input name="email" type="email" required></label>
+        <button>Consultar descuento</button>
+      </form>
+      <p id="membershipRedemptionStatus" role="status"></p>
+    </details>
+    <details class="surface">
+      <summary>Solicitudes de socios 2027/2028</summary>
+      <button id="loadMembershipRequests" type="button">Consultar solicitudes</button>
+      <p id="membershipRequestStatus" role="status"></p>
+      <ul id="membershipRequests"></ul>
+    </details>
+    <details id="reminders" class="surface">
       <summary>Vista previa de recordatorios de cuotas</summary>
       <p>Consulta qué cuotas vencerían 7 días después de la fecha elegida.</p>
-      <form id="reminderPreview">
+      <form id="reminderPreview" class="inline-fields">
         <label>Fecha de referencia <input name="previewDate" type="date" required></label>
         <button>Consultar avisos</button>
-        <button id="sendReminderTest" type="button">Enviar al buzón de prueba</button>
+        <button id="sendReminderTest" class="secondary" type="button">Enviar al buzón de prueba</button>
       </form>
       <p id="reminderStatus" role="status"></p>
       <ul id="reminderResults"></ul>
-      <button id="checkScheduledReminder" type="button">Consultar último envío automático</button>
+      <div class="scheduled"><button id="checkScheduledReminder" class="secondary" type="button">Consultar último envío automático</button>
       <p id="scheduledReminderStatus" role="status"></p>
+      </div>
     </details>
   </section>
 </main>
-<script src="panel.js?v=0bf3f9c01551" defer></script>
+<script src="exportar-packs.js?v=c53ae8de7940" defer></script>
+<script src="panel.js?v=8650be85c6da" defer></script>
 </html>
+
+
+
+
 
 
 

@@ -3,6 +3,7 @@ const apiKey = 'sb_publishable_U3568BhgdgCt7ysDU5l1CA_1CenKkjU';
 const get = id => document.getElementById(id);
 const money = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
 const date = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Madrid' });
+const filterDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' });
 const statuses = { pending: 'Pendiente', in_review: 'En revisión', confirmed: 'Confirmado', not_applicable: 'No aplica' };
 let token = '';
 let rows = [];
@@ -147,12 +148,144 @@ function agreementForm(row, account, refresh) {
   return form;
 }
 
-function render() {
+function matchesPaymentState(account, state) {
+  if (!state) return true;
+  if (!account) return false;
+  if (state === 'agreement_pending') return account.agreement_pending === true;
+  if (state === 'settled') return account.confirmed > 0 && account.pending === 0 && account.in_review === 0;
+  return account[state] > 0;
+}
+
+function matchesDueFilter(payment, filter) {
+  if (!filter) return true;
+  if (payment.status !== 'pending' || !payment.due_on) return false;
+  const today = filterDate.format(new Date());
+  const end = new Date(today + 'T00:00:00Z');
+  end.setUTCDate(end.getUTCDate() + 7);
+  return filter === 'overdue' ? payment.due_on < today
+    : payment.due_on >= today && payment.due_on <= end.toISOString().slice(0, 10);
+}
+
+function searchableName(value) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300\u0301\u0302\u0308]/g, '');
+}
+
+function matchesPlayerFilters(player, team, category, kit) {
+  return (!team || teamName(player) === team) && (!category || player.category === category) &&
+    (!kit || player.hasKit === (kit === 'owned'));
+}
+
+function filteredRegistrations() {
   const query = get('reference').value.trim().toLowerCase();
+  const nameQuery = searchableName(query);
+  const accountFilter = get('accountFilter').value;
   const team = get('team').value;
-  const filtered = rows.filter(row => reference(row).toLowerCase().includes(query) &&
-    (!team || row.summary.players.some(player => teamName(player) === team)));
-  get('count').textContent = filtered.length + ' inscripciones';
+  const category = get('categoryFilter').value;
+  const kit = get('kitFilter').value;
+  const from = get('registrationFrom').value;
+  const until = get('registrationUntil').value;
+  const state = get('paymentState').value;
+  const mode = get('paymentMode').value;
+  const due = get('dueFilter').value;
+  return rows.filter(row => {
+    const received = filterDate.format(new Date(row.received_at));
+    return (reference(row).toLowerCase().includes(query) || row.accountEmail?.toLowerCase().includes(query) ||
+      row.summary.players.some(player => player.name && searchableName(player.name).includes(nameQuery))) &&
+      (!accountFilter || row.accountLinked === (accountFilter === 'linked')) &&
+      (!from || received >= from) && (!until || received <= until) &&
+      row.summary.players.some(player => matchesPlayerFilters(player, team, category, kit)) &&
+      matchesPaymentState(row.paymentFlags, state) &&
+      (!mode || row.paymentFlags?.mode === mode) &&
+      (!due || row.paymentFlags?.installments?.some(payment => matchesDueFilter(payment, due)));
+  });
+}
+
+function renderPaymentTotals(filtered) {
+  const totals = get('filteredPaymentTotals');
+  const entries = filtered.filter(row => row.paymentFlags);
+  totals.textContent = '';
+  if (entries.length) {
+    const amount = name => money.format(entries.reduce((sum, row) =>
+      sum + Math.round(Number(row.paymentFlags[name] ?? 0) * 100), 0) / 100);
+    totals.textContent = [
+      entries.length === filtered.length ? 'Importes de las inscripciones mostradas' : 'Importes disponibles (' + entries.length + ' de ' + filtered.length + ')',
+      'Confirmado ' + amount('confirmed'), 'En revisión ' + amount('in_review'), 'Pendiente ' + amount('pending'),
+    ].join(' · ');
+  }
+}
+
+function filteredKits(registrations) {
+  const team = get('team').value;
+  const category = get('categoryFilter').value;
+  const kit = get('kitFilter').value;
+  return registrations.flatMap(row => row.summary.players
+    .filter(player => !player.hasKit && matchesPlayerFilters(player, team, category, kit))
+    .map(player => ({row, player})));
+}
+
+function registrationDetails(row) {
+  const section = document.createElement('details');
+  const content = item('div', '');
+  section.append(item('summary', 'Ver ficha y autorizaciones'), content);
+  let loading = false;
+  section.ontoggle = async () => {
+    if (!section.open || loading || content.childElementCount) return;
+    loading = true;
+    content.textContent = 'Consultando ficha…';
+    try {
+      const record = await rpc('bm_pinto_read_registration_test_details', { p_id: row.id });
+      if (!section.isConnected) return;
+      content.textContent = '';
+      if (!record) {
+        content.append(item('p', 'Esta inscripción se guardó antes de habilitar la ficha completa.'));
+        return;
+      }
+      const contact = record.contact;
+      content.append(item('p', [contact.name, contact.email, contact.phone].join(' · ')));
+      record.players.forEach((player, index) => {
+        const name = row.summary.players[index]?.name || 'Jugador ' + (index + 1);
+        content.append(item('strong', name),
+          item('p', [
+            'Nacimiento ' + player.birth.split('-').reverse().join('/'),
+            player.playerId && 'DNI/NIE del jugador ' + player.playerId,
+            player.guardianId && 'DNI/NIE del responsable ' + player.guardianId,
+            player.address, player.town, 'Empadronado en Pinto ' + player.registeredInPinto,
+          ].filter(Boolean).join(' · ')),
+          item('p', 'Actividades fuera del pabellón ' + player.authorizations.outings +
+            ' · Transporte con el equipo ' + player.authorizations.transport +
+            ' · Publicación de imágenes ' + player.authorizations.images));
+      });
+      content.append(item('small', 'Registrado ' + date.format(new Date(record.recorded_at)) +
+        ' · Versión de autorizaciones ' + record.authorization_version));
+    } catch {
+      if (section.isConnected) content.textContent = 'No se pudo consultar la ficha. Cierra y vuelve a abrir para reintentar.';
+    } finally {
+      loading = false;
+    }
+  };
+  return section;
+}
+
+function render() {
+  const filtered = filteredRegistrations();
+  get('exportRegistrations').disabled = filtered.length === 0;
+  get('exportPlayers').disabled = filtered.length === 0;
+  const kits = filteredKits(filtered);
+  const exportable = kits.filter(({player}) => player.equipment);
+  const measuredAtClub = exportable.filter(({player}) => player.equipment.fitted).length;
+  get('exportKits').disabled = exportable.length === 0;
+  get('kitExportSummary').textContent = kits.length
+    ? [
+      exportable.length + ' packs exportables',
+      measuredAtClub ? measuredAtClub + ' con tallas tomadas en el club (sin talla en el Excel)' : '',
+      kits.length > exportable.length ? (kits.length - exportable.length) + ' sin datos de prendas' : '',
+    ].filter(Boolean).join(' · ')
+    : 'Ningún jugador de la selección necesita el pack.';
+  const due = get('dueFilter').value;
+  get('exportInstallments').disabled = !filtered.some(row =>
+    row.paymentFlags?.installments?.some(payment => matchesDueFilter(payment, due)));
+  get('count').textContent = filtered.length + (filtered.length === 1 ? ' inscripción' : ' inscripciones');
+  renderPaymentTotals(filtered);
   get('registrations').replaceChildren(...filtered.map(row => {
     const entry = document.createElement('li');
     const details = document.createElement('details');
@@ -163,14 +296,26 @@ function render() {
       details.append(status);
       try {
         const account = await rpc('bm_pinto_registration_test_payments', { p_registration_id: row.id });
+        if (!details.isConnected) return;
+        row.paymentFlags = account;
+        const mode = get('paymentMode').value;
+        const due = get('dueFilter').value;
+        if (!matchesPaymentState(account, get('paymentState').value) || (mode && account.mode !== mode) ||
+          (due && !account.installments.some(payment => matchesDueFilter(payment, due)))) {
+          render();
+          return;
+        }
+        renderPaymentTotals(filteredRegistrations());
         status.textContent = account.agreement_pending ? 'Acuerdo pendiente de concretar' :
           [account.mode === 'demand' ? 'Pago a demanda' : account.mode === 'agreement' ? 'Acuerdo de pago con el club' : account.mode === 'single' ? 'Pago único' : 'Pago fraccionado',
             'Total ' + money.format(account.total), 'Confirmado ' + money.format(account.confirmed),
             'En revisión ' + money.format(account.in_review), 'Pendiente ' + money.format(account.pending)].join(' · ');
         const installments = document.createElement('ul');
         for (const payment of account.installments) {
-          const line = item('li', (payment.due_on ? 'Cuota ' + payment.installment + ' · ' + payment.due_on.split('-').reverse().join('/') : 'Ingreso sin vencimiento · ' + date.format(new Date(payment.confirmed_at))) + ' · ' +
-            money.format(payment.amount) + ' · ' + statuses[payment.status]);
+          const line = document.createElement('li');
+          line.className = 'payment-row';
+          line.append(item('span', (payment.due_on ? 'Cuota ' + payment.installment + ' · ' + payment.due_on.split('-').reverse().join('/') : 'Ingreso sin vencimiento · ' + date.format(new Date(payment.confirmed_at))) + ' · ' +
+            money.format(payment.amount) + ' · ' + statuses[payment.status]));
           if (payment.status === 'pending' || payment.status === 'in_review') {
             const button = item('button', 'Confirmar ingreso');
             button.type = 'button';
@@ -224,6 +369,43 @@ function render() {
             };
             line.append(' ', download);
           }
+          if (payment.status === 'in_review' && payment.receipt_received_at) {
+            const reject = item('button', 'Rechazar justificante');
+            reject.type = 'button';
+            const rejection = document.createElement('details');
+            const reason = document.createElement('textarea');
+            reason.maxLength = 300;
+            const reasonLabel = item('label', 'Motivo visible para la familia');
+            reasonLabel.append(reason);
+            const feedback = item('p', '');
+            feedback.setAttribute('role', 'status');
+            rejection.append(item('summary', 'Rechazar justificante…'), reasonLabel, reject, feedback);
+            reject.onclick = async () => {
+              if (!reason.value.trim()) {
+                feedback.textContent = 'Escribe el motivo del rechazo.';
+                reason.focus();
+                return;
+              }
+              const controls = [...line.querySelectorAll('button:not(:disabled)')];
+              controls.forEach(button => { button.disabled = true; });
+              try {
+                await rpc('bm_pinto_reject_registration_test_receipt', {
+                  p_id: row.id, p_schedule: payment.schedule, p_installment: payment.installment, p_reason: reason.value.trim(),
+                });
+                if (!details.isConnected) return;
+                get('status').textContent = 'Justificante rechazado. La familia ya puede adjuntar otro.';
+                details.replaceChildren(details.querySelector('summary'));
+                if (details.open) details.dispatchEvent(new Event('toggle'));
+              } catch (error) {
+                if (!details.isConnected) return;
+                get('status').textContent = error.code === 'PGRST202'
+                  ? 'Ejecuta el SQL 41 para habilitar el rechazo con motivo.'
+                  : 'No se pudo rechazar el justificante. Actualiza el panel y comprueba el estado de la cuota.';
+                controls.forEach(button => { button.disabled = false; });
+              }
+            };
+            line.append(rejection);
+          }
           installments.append(line);
         }
         details.append(installments);
@@ -266,21 +448,114 @@ function render() {
       }
     });
     const teams = row.summary.players.map(player => teamName(player));
-    entry.append(item('strong', reference(row)), item('p', date.format(new Date(row.received_at)) + ' · ' + teams.join(', ')), details);
+    if (row.summary.players.some(player => player.name)) {
+      const roster = document.createElement('ul');
+      roster.className = 'registration-players';
+      for (const player of row.summary.players) {
+        const member = document.createElement('li');
+        member.append(item('strong', player.name || 'Jugador sin nombre registrado'),
+          item('span', teamName(player)));
+        const equipment = player.equipment;
+        const kitInfo = player.hasKit ? 'Ya tiene el pack inicial'
+          : !equipment ? 'Necesita el pack · Datos de prendas sin registrar'
+          : [
+            equipment.role === 'goalkeeper' ? 'Pack de portero' : 'Pack de jugador',
+            equipment.fitted ? 'Tallas tomadas en el club' : 'Camisetas ' + equipment.shirt + ' · Pantalón ' + equipment.trousers,
+            'Estampado ' + equipment.printName,
+          ].join(' · ');
+        const kitDetail = item('small', kitInfo);
+        kitDetail.className = 'registration-kit';
+        member.append(kitDetail);
+        roster.append(member);
+      }
+      entry.append(roster, item('small', date.format(new Date(row.received_at)) + ' · Referencia ' + reference(row)));
+    } else {
+      entry.append(item('strong', reference(row)), item('p', date.format(new Date(row.received_at)) + ' · ' + teams.join(', ')));
+    }
+    if (typeof row.accountLinked === 'boolean') {
+      entry.append(item('p', row.accountLinked ? row.accountEmail || 'Cuenta vinculada' : 'Sin cuenta vinculada'));
+    }
+    entry.append(registrationDetails(row), details);
+    const deletion = document.createElement('details');
+    const remove = item('button', 'Eliminar esta inscripción de prueba');
+    remove.type = 'button';
+    const confirmDeletion = document.createElement('input');
+    confirmDeletion.type = 'checkbox';
+    const confirmation = item('label', 'Confirmo que esta es la inscripción duplicada');
+    confirmation.prepend(confirmDeletion);
+    confirmation.className = 'delete-confirmation';
+    remove.disabled = true;
+    confirmDeletion.onchange = () => { remove.disabled = !confirmDeletion.checked; };
+    const result = item('p', '');
+    result.setAttribute('role', 'status');
+    deletion.append(item('summary', 'Eliminar duplicado'),
+      item('p', 'Comprueba la referencia y el justificante antes de eliminar. Se borrarán también los datos y archivos de esta inscripción.'),
+      confirmation, remove, result);
+    remove.onclick = async () => {
+      if (!token || remove.disabled) return;
+      const session = token;
+      remove.disabled = confirmDeletion.disabled = true;
+      result.textContent = 'Eliminando inscripción…';
+      try {
+        const deleted = await rpc('bm_pinto_delete_registration_test', {p_id: row.id});
+        if (token !== session) return;
+        rows = rows.filter(registration => registration.id !== row.id);
+        render();
+        get('status').textContent = deleted ? 'Inscripción eliminada.' : 'La inscripción ya se había eliminado.';
+      } catch (error) {
+        if (token !== session) return;
+        result.textContent = error.code === '23514' ? 'Esta inscripción tiene pagos confirmados y no se puede eliminar.'
+          : error.code === 'PGRST202' ? 'Ejecuta el SQL 51 para habilitar esta opción.'
+          : 'No se pudo eliminar la inscripción. Actualiza el panel antes de reintentar.';
+        remove.disabled = false;
+        confirmDeletion.disabled = false;
+      }
+    };
+    entry.append(deletion);
     return entry;
   }));
 }
 
 async function load() {
   const current = ++revision;
-  const response = await rpc('bm_pinto_list_registration_tests');
+  const [response, paymentStates] = await Promise.all([
+    rpc('bm_pinto_list_registration_tests'),
+    rpc('bm_pinto_registration_test_payment_states').catch(error => {
+      if (error.status === 404 || error.code === 'PGRST202') return null;
+      throw error;
+    }),
+  ]);
   if (revision !== current) return;
   rows = response;
+  const paymentFilter = get('paymentState');
+  paymentFilter.disabled = !paymentStates;
+  paymentFilter.title = paymentStates ? '' : 'Ejecuta el SQL 39 para activar este filtro.';
+  if (!paymentStates) paymentFilter.value = '';
+  const flags = new Map((paymentStates ?? []).map(state => [state.id, state.payment_flags]));
+  const modeFilter = get('paymentMode');
+  modeFilter.disabled = !paymentStates?.some(state => state.payment_flags.mode);
+  if (modeFilter.disabled) modeFilter.value = '';
+  const dueFilter = get('dueFilter');
+  dueFilter.disabled = !paymentStates?.some(state => Array.isArray(state.payment_flags.installments));
+  if (dueFilter.disabled) dueFilter.value = '';
+  const accountFilter = get('accountFilter');
+  accountFilter.disabled = !paymentStates?.some(state => typeof state.payment_flags.account_linked === 'boolean');
+  if (accountFilter.disabled) accountFilter.value = '';
+  for (const row of rows) {
+    row.paymentFlags = flags.get(row.id);
+    row.accountLinked = row.paymentFlags?.account_linked;
+    row.accountEmail = row.paymentFlags?.account_email;
+  }
   const select = get('team');
   const previous = select.value;
   const teams = [...new Set(rows.flatMap(row => row.summary.players.map(teamName)))].sort((a, b) => a.localeCompare(b, 'es'));
   select.replaceChildren(new Option('Todos los equipos', ''), ...teams.map(team => new Option(team, team)));
   if (teams.includes(previous)) select.value = previous;
+  const category = get('categoryFilter');
+  const previousCategory = category.value;
+  const categories = [...new Set(rows.flatMap(row => row.summary.players.map(player => player.category)))].sort((a, b) => a.localeCompare(b, 'es'));
+  category.replaceChildren(new Option('Todas las categorías', ''), ...categories.map(name => new Option(name, name)));
+  if (categories.includes(previousCategory)) category.value = previousCategory;
   render();
 }
 
@@ -364,6 +639,132 @@ get('sendReminderTest').onclick = async event => {
   }
 };
 get('team').addEventListener('change', render);
+get('paymentState').addEventListener('change', render);
+get('paymentMode').addEventListener('change', render);
+get('accountFilter').addEventListener('change', render);
+get('dueFilter').addEventListener('change', render);
+get('categoryFilter').addEventListener('change', render);
+get('kitFilter').addEventListener('change', render);
+get('registrationFrom').addEventListener('change', render);
+get('registrationUntil').addEventListener('change', render);
+function clearRegistrationFilters() {
+  for (const id of ['team', 'categoryFilter', 'kitFilter', 'paymentState', 'paymentMode', 'accountFilter', 'dueFilter', 'reference', 'registrationFrom', 'registrationUntil']) {
+    get(id).value = '';
+  }
+}
+get('clearRegistrationFilters').onclick = () => {
+  clearRegistrationFilters();
+  render();
+};
+function downloadCsv(table, filename) {
+  const csvCell = value => {
+    const content = String(value);
+    const safe = /^[\s]*[=+@-]|^[\t\r\n]/.test(content) ? "'" + content : content;
+    return '"' + safe.replaceAll('"', '""') + '"';
+  };
+  const csv = table.map(columns => columns.map(csvCell).join(';')).join('\r\n');
+  const url = URL.createObjectURL(new Blob(['\uFEFF', csv], {type: 'text/csv;charset=utf-8'}));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportPayments(detail) {
+  if (!token) return;
+  const filtered = filteredRegistrations();
+  if (!filtered.length) return;
+  const decimal = new Intl.NumberFormat('es-ES', {
+    useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2,
+  });
+  const formatAmount = value => value == null ? '' : decimal.format(value);
+  const modes = {single: 'Pago único', split: 'Pago fraccionado', agreement: 'Acuerdo con el club', demand: 'Pago a demanda'};
+  const table = [detail
+    ? ['Referencia', 'Jugadores', 'Equipos', 'Modalidad de pago', 'Calendario', 'Cuota o ingreso', 'Vencimiento', 'Importe (€)', 'Estado']
+    : ['Referencia', 'Jugadores', 'Fecha de inscripción', 'Categorías', 'Equipos', 'Modalidad de pago', 'Confirmado (€)',
+      'En revisión (€)', 'Pendiente (€)', 'Acuerdo por concretar']];
+  const due = get('dueFilter').value;
+  for (const row of filtered) {
+    const account = row.paymentFlags;
+    const names = row.summary.players.map(player => player.name).filter(Boolean).join(' / ');
+    const teams = [...new Set(row.summary.players.map(teamName))].join(' / ');
+    if (detail) {
+      for (const payment of account?.installments ?? []) {
+        if (!matchesDueFilter(payment, due)) continue;
+        table.push([reference(row), names, teams, modes[account.mode] ?? '',
+          payment.schedule === 'standard' ? 'Estándar' : 'Acuerdo',
+          payment.installment, payment.due_on?.split('-').reverse().join('/') ?? '',
+          formatAmount(payment.amount), statuses[payment.status] ?? '']);
+      }
+      continue;
+    }
+    table.push([
+      reference(row), names, date.format(new Date(row.received_at)),
+      [...new Set(row.summary.players.map(player => player.category))].join(' / '),
+      teams,
+      modes[account?.mode] ?? '',
+      formatAmount(account?.confirmed), formatAmount(account?.in_review), formatAmount(account?.pending),
+      account ? (account.agreement_pending ? 'Sí' : 'No') : '',
+    ]);
+  }
+  downloadCsv(table, detail ? 'cuotas-de-prueba.csv' : 'inscripciones-de-prueba.csv');
+}
+get('exportRegistrations').onclick = () => exportPayments(false);
+get('exportInstallments').onclick = () => exportPayments(true);
+get('exportKits').onclick = () => {
+  if (!token) return;
+  const garments = [];
+  let missing = 0;
+  for (const {row, player} of filteredKits(filteredRegistrations())) {
+      const equipment = player.equipment;
+      if (!equipment) {
+        missing++;
+        continue;
+      }
+      const goalkeeper = equipment.role === 'goalkeeper';
+      const pattern = player.division === 'female' ? 'CHICA' : player.division === 'male' ? 'CHICO' : '';
+      const base = {
+        'CHICO/A': pattern, Categoria: player.category, Cantidad: 1,
+        OBSERVACIONES: [player.name, teamName(player), equipment.fitted ? 'Tallas tomadas en el club' : '', reference(row)].filter(Boolean).join(' · '),
+      };
+      garments.push(
+        {...base, 'TIPO DE PRENDA': goalkeeper ? 'Camiseta de portero · Primera equipación' : 'Camiseta de jugador · Primera equipación',
+          Color: goalkeeper ? '' : 'Roja', NOMBRE: equipment.printName, Talla: equipment.shirt},
+        {...base, 'TIPO DE PRENDA': goalkeeper ? 'Camiseta de portero · Segunda equipación' : 'Camiseta de jugador · Segunda equipación',
+          NOMBRE: equipment.printName, Talla: equipment.shirt},
+        {...base, 'TIPO DE PRENDA': goalkeeper ? 'Pantalón largo de portero' : 'Pantalón corto de jugador',
+          Talla: equipment.trousers},
+      );
+  }
+  if (garments.length) {
+    const url = URL.createObjectURL(new Blob([buildWorkbook(garments)], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'packs-iniciales-de-prueba.xlsx';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  get('status').textContent = (garments.length ? 'Packs descargados: ' + garments.length / 3 + '.' : 'No hay packs con datos de prendas para descargar.') +
+    (missing ? ' Sin datos de prendas: ' + missing + ' jugadores de inscripciones anteriores.' : '');
+};
+get('exportPlayers').onclick = () => {
+  if (!token) return;
+  const team = get('team').value;
+  const category = get('categoryFilter').value;
+  const kit = get('kitFilter').value;
+  const table = [['Jugador', 'Categoría', 'Equipo', 'Pack inicial', 'Referencia']];
+  for (const row of filteredRegistrations()) {
+    for (const player of row.summary.players) {
+      if (!matchesPlayerFilters(player, team, category, kit)) continue;
+      table.push([player.name ?? '', player.category, teamName(player),
+        player.hasKit ? 'Ya lo tiene' : 'Lo necesita', reference(row)]);
+    }
+  }
+  if (table.length > 1) downloadCsv(table, 'jugadores-de-prueba.csv');
+};
 get('reminderPreview').onsubmit = async event => {
   event.preventDefault();
   const form = event.currentTarget;
@@ -420,6 +821,132 @@ get('reminderPreview').onsubmit = async event => {
   }
 };
 get('reference').addEventListener('input', render);
+get('loadMembershipRequests').onclick = async () => {
+  const requestMembershipCard = id => request('/functions/v1/enviar-carne-socio-prueba', {id});
+  const session = token;
+  if (!session) return;
+  const status = get('membershipRequestStatus');
+  const list = get('membershipRequests');
+  const loadButton = get('loadMembershipRequests');
+  loadButton.disabled = true;
+  status.textContent = 'Consultando solicitudes…';
+  try {
+    const requests = await rpc('bm_pinto_review_membership_test', {p_id: null});
+    if (token !== session) return;
+    list.replaceChildren();
+    status.textContent = requests.length + (requests.length === 1 ? ' solicitud de prueba' : ' solicitudes de prueba');
+    for (const request of requests) {
+      const entry = item('li', '');
+      const title = request.kind === 'renew' ? 'Renovación' : 'Alta · ' + request.profile.fullName;
+      const result = item('p', request.approved_at ? 'Validada' : 'Pendiente de revisión');
+      const cardStatus = item('p', {
+        sent: 'Carné de prueba enviado.',
+        sending: 'Envío en curso o pendiente de comprobar.',
+        uncertain: 'Envío sin confirmar. Revisa el buzón de prueba.',
+        failed: 'Falló la preparación del carné. Puedes reintentar.',
+      }[request.card_state] ?? '');
+      cardStatus.setAttribute('role', 'status');
+      const sendCard = item('button', 'Enviar carné de prueba');
+      sendCard.type = 'button';
+      sendCard.hidden = !request.approved_at || ['sent', 'sending', 'uncertain'].includes(request.card_state);
+      async function sendApprovedCard() {
+        if (location.protocol === 'file:') {
+          cardStatus.textContent = 'La solicitud está validada. Abre el panel publicado en GitHub Pages para enviar el carné de prueba.';
+          return;
+        }
+        sendCard.disabled = true;
+        cardStatus.textContent = 'Preparando el carné de prueba…';
+        try {
+          const result = await requestMembershipCard(request.id);
+          if (token !== session || !entry.isConnected) return;
+          cardStatus.textContent = result.message;
+          sendCard.hidden = true;
+        } catch (error) {
+          if (token !== session || !entry.isConnected) return;
+          cardStatus.textContent = error.serverMessage || 'No se confirmó el envío. Comprueba el buzón de prueba.';
+        } finally {
+          sendCard.disabled = false;
+        }
+      }
+      sendCard.onclick = sendApprovedCard;
+      if (request.kind === 'renew') result.textContent += request.previous_member
+        ? ' · Documento en el padrón anterior' : ' · Documento sin coincidencia en el padrón anterior';
+      const download = item('button', 'Descargar justificante');
+      download.type = 'button';
+      const approve = item('button', 'Validar solicitud de prueba');
+      approve.type = 'button';
+      approve.hidden = Boolean(request.approved_at || (request.kind === 'renew' && !request.previous_member));
+      download.onclick = async () => {
+        download.disabled = true;
+        try {
+          const receipt = await rpc('bm_pinto_review_membership_test', {p_id: request.id});
+          if (token !== session || !entry.isConnected) return;
+          const extension = {'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png'}[receipt?.mime];
+          if (!extension) throw Error('Archivo no disponible');
+          const bytes = Uint8Array.from(atob(receipt.file), char => char.charCodeAt(0));
+          const url = URL.createObjectURL(new Blob([bytes], {type: receipt.mime}));
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'socio-prueba-' + request.id + '.' + extension;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {
+          if (token === session) status.textContent = 'No se pudo descargar el justificante.';
+        } finally {
+          download.disabled = false;
+        }
+      };
+      approve.onclick = async () => {
+        if (!window.confirm('¿Has comprobado el ingreso de esta solicitud de prueba?')) return;
+        approve.disabled = true;
+        try {
+          const validated = await rpc('bm_pinto_review_membership_test', {p_id: request.id, p_approve: true});
+          if (token !== session || !entry.isConnected) return;
+          if (!validated?.approved_at) throw Error('Solicitud no disponible');
+          approve.hidden = true;
+          result.textContent = 'Validada';
+          sendCard.hidden = false;
+          await sendApprovedCard();
+        } catch {
+          if (token === session) status.textContent = 'No se pudo validar la solicitud.';
+        } finally {
+          approve.disabled = false;
+        }
+      };
+      entry.append(item('strong', title), item('p', 'Referencia SOCIO-PRUEBA-' + request.id), result, download, ' ', approve, ' ', sendCard, cardStatus);
+      list.append(entry);
+    }
+  } catch {
+    if (token === session) status.textContent = 'No se pudieron consultar las solicitudes de socios.';
+  } finally {
+    loadButton.disabled = false;
+  }
+};
+const membershipForm = get('membershipRedemption');
+const discountStatus = get('membershipRedemptionStatus');
+membershipForm.elements.email.oninput = () => { discountStatus.textContent = ''; };
+membershipForm.onsubmit = async event => {
+  event.preventDefault();
+  const session = token;
+  const input = membershipForm.elements.email;
+  const button = membershipForm.querySelector('button');
+  if (!session || button.disabled) return;
+  const address = input.value.trim();
+  button.disabled = input.disabled = true;
+  discountStatus.textContent = 'Consultando descuento…';
+  try {
+    const result = await rpc('bm_pinto_registration_test_membership_redemption', {p_email: address});
+    if (token !== session) return;
+    discountStatus.textContent = result.status === 'redeemed' ? 'Descuento de prueba ya registrado: ' + money.format(result.amount) + '.'
+      : result.status === 'no_account' ? 'No hay una cuenta familiar verificada con ese correo.'
+      : result.discount > 0 ? 'Descuento previsto en el alta: ' + money.format(result.discount) + '.'
+      : 'Esta cuenta no tiene descuento disponible.';
+  } catch {
+    if (token === session) discountStatus.textContent = 'No se pudo comprobar el descuento.';
+  } finally {
+    button.disabled = input.disabled = false;
+  }
+};
 get('refresh').addEventListener('click', async () => {
   try {
     await load();
@@ -429,6 +956,10 @@ get('refresh').addEventListener('click', async () => {
   }
 });
 get('logout').addEventListener('click', () => {
+  get('membershipRequests').replaceChildren();
+  get('membershipRequestStatus').textContent = '';
+  discountStatus.textContent = '';
+  membershipForm.reset();
   revision++;
   token = '';
   rows = [];
@@ -436,12 +967,13 @@ get('logout').addEventListener('click', () => {
   get('reminderResults').replaceChildren();
   get('reminderStatus').textContent = '';
   get('scheduledReminderStatus').textContent = '';
-  get('reference').value = '';
-  get('team').value = '';
+  clearRegistrationFilters();
   get('status').textContent = '';
   get('panel').hidden = true;
   get('login').hidden = false;
 });
+
+
 
 
 
