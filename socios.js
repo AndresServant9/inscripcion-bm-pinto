@@ -6,26 +6,12 @@ const receiptStep = document.querySelector('#receiptStep');
 const requestSummary = document.querySelector('#requestSummary');
 const api = 'https://dfwnzfznhnkcqrdcydnx.supabase.co/rest/v1/rpc/bm_pinto_submit_membership_test';
 const key = 'sb_publishable_U3568BhgdgCt7ysDU5l1CA_1CenKkjU';
-const discountLogin = document.querySelector('#discountLogin');
-const discountPreview = document.querySelector('#discountPreview');
-const discountStatus = document.querySelector('#discountPreviewStatus');
 const currency = new Intl.NumberFormat('es-ES', {style: 'currency', currency: 'EUR'});
-let discountRevision = 0;
 let draft;
-let verifiedQuote;
+let reviewRequestId = crypto.randomUUID();
 
 function identifierValue(form) {
   return form.elements.identifier.value.replace(/[\s.-]/g, '').toUpperCase();
-}
-
-function quoteIdentity() {
-  return {identifier: identifierValue(profile), email: profile.elements.email.value.trim().toLowerCase()};
-}
-
-function describeQuote(result) {
-  return 'Cuota de socio estimada: ' + currency.format(result.base_fee - result.membership_discount) + '.' +
-    (result.pending_installment_discount > 0
-      ? ' Ajuste previsto en la última cuota de la inscripción: ' + currency.format(result.pending_installment_discount) + '.' : '');
 }
 
 function clearStatus() {
@@ -38,69 +24,17 @@ function selectMode() {
   receiptStep.reset();
   receiptStep.hidden = true;
   const renew = choices.find(choice => choice.checked).value === 'renew';
-  discountRevision++;
-  verifiedQuote = null;
-  discountPreview.hidden = renew;
-  discountStatus.textContent = '';
   profile.hidden = renew;
   renewal.hidden = !renew;
   clearStatus();
 }
-discountLogin.onsubmit = async event => {
-  event.preventDefault();
-  const revision = ++discountRevision;
-  verifiedQuote = null;
-  const button = discountLogin.querySelector('button');
-  button.disabled = true;
-  discountStatus.textContent = 'Consultando descuento…';
-  try {
-    const identity = quoteIdentity();
-    if (!/^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Z]$/.test(identity.identifier) || !identity.email) {
-      throw Error('Rellena primero el DNI o NIE y el correo del alta.');
-    }
-    const base = new URL(api).origin;
-    const headers = {apikey: key, 'Content-Type': 'application/json'};
-    const email = discountLogin.elements.email.value.trim();
-    const login = await fetch(base + '/auth/v1/token?grant_type=password', {
-      method: 'POST', headers, body: JSON.stringify({email, password: discountLogin.elements.password.value}),
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!login.ok) throw Error('No se pudo verificar la cuenta.');
-    const account = await login.json();
-    const quote = await fetch(base + '/rest/v1/rpc/bm_pinto_preview_membership_test_quote', {
-      method: 'POST', headers: {...headers, Authorization: 'Bearer ' + account.access_token},
-      body: JSON.stringify({p_identifier: identity.identifier, p_email: identity.email}),
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!quote.ok) throw Error('No se pudo consultar el descuento.');
-    const result = await quote.json();
-    if (!result) throw Error('El DNI o NIE y el correo del alta deben coincidir con los de tu cuenta verificada del club.');
-    if (revision !== discountRevision) return;
-    verifiedQuote = {identity, accessToken: account.access_token};
-    discountStatus.textContent = describeQuote(result) + ' El club confirma el descuento al revisar la solicitud.';
-  } catch (error) {
-    if (revision === discountRevision) discountStatus.textContent = error.message;
-  } finally {
-    discountLogin.elements.password.value = '';
-    button.disabled = false;
-  }
-};
-
 for (const choice of choices) choice.addEventListener('change', selectMode);
-for (const field of [profile.elements.identifier, profile.elements.email]) {
-  field.addEventListener('input', () => {
-    discountRevision++;
-    verifiedQuote = null;
-    discountStatus.textContent = '';
-  });
-}
 for (const form of [profile, renewal]) {
   form.oninput = clearStatus;
   form.onsubmit = async event => {
     event.preventDefault();
     const button = form.querySelector('button');
     if (button.disabled) return;
-    if (form === profile && discountLogin.querySelector('button').disabled) return;
     const identifier = form.elements.identifier;
     const normalized = identifierValue(form);
     statusMessage.hidden = false;
@@ -113,25 +47,28 @@ for (const form of [profile, renewal]) {
     const data = Object.fromEntries(new FormData(form));
     delete data.identifier;
     let reservation;
-    const authorization = kind === 'new' && verifiedQuote?.identity.identifier === normalized &&
-      verifiedQuote.identity.email === data.email.trim().toLowerCase() ? verifiedQuote.accessToken : null;
-    const requestId = crypto.randomUUID();
-    if (authorization) {
-      const controls = [...form.elements, ...choices, ...discountLogin.elements];
+    const requestId = kind === 'new' ? reviewRequestId : crypto.randomUUID();
+    if (kind === 'new') {
+      const controls = [...form.elements, ...choices];
       controls.forEach(control => { control.disabled = true; });
-      statusMessage.textContent = 'Reservando el descuento…';
+      statusMessage.textContent = 'Comprobando las inscripciones y calculando la cuota…';
       try {
-        const response = await fetch(new URL('/rest/v1/rpc/bm_pinto_reserve_membership_test_quote', api), {
+        const response = await fetch(new URL('/rest/v1/rpc/bm_pinto_prepare_membership_quote', api), {
           method: 'POST',
-          headers: {apikey: key, 'Content-Type': 'application/json', Authorization: 'Bearer ' + authorization},
+          headers: {apikey: key, 'Content-Type': 'application/json'},
           body: JSON.stringify({p_id: requestId, p_identifier: normalized, p_email: data.email.trim()}),
           signal: AbortSignal.timeout(15000),
         });
         if (!response.ok) {
           const error = await response.json().catch(() => ({}));
-          throw Error(error.message === 'Ya hay una solicitud para este documento'
-            ? 'Ya hay una solicitud para este documento. Contacta con el club.'
-            : 'No se pudo reservar el descuento. Vuelve a consultar con tu cuenta antes de transferir.');
+          if (error.message === 'Ya hay una solicitud para este documento') {
+            throw Error('Ya hay una solicitud para este documento. Contacta con el club.');
+          }
+          if (error.message?.startsWith('El DNI y el correo corresponden') ||
+            error.message === 'Revisa el DNI o NIE y el correo del alta') {
+            throw Error(error.message);
+          }
+          throw Error('No se pudo comprobar el descuento. Vuelve a revisar el alta antes de transferir.');
         }
         reservation = await response.json();
         if (!reservation?.id) throw Error('No se pudo confirmar la reserva. Vuelve a intentarlo.');
@@ -166,10 +103,12 @@ for (const form of [profile, renewal]) {
         controls.forEach(control => { control.disabled = false; });
       }
     }
-    draft = {submission: {p_id: reservation?.id ?? requestId, p_identifier: normalized, p_kind: kind, p_profile: data}, authorization};
+    draft = {submission: {p_id: reservation?.id ?? requestId, p_identifier: normalized, p_kind: kind, p_profile: data}};
     requestSummary.textContent = kind === 'new'
       ? data.fullName + ' · ' + data.email + ' · ' +
         (reservation ? 'Importe a transferir: ' + currency.format(reservation.base_fee - reservation.membership_discount) + '.' +
+          (reservation.membership_discount > 0
+            ? ' Como la inscripción ya está pagada, aplicamos ' + currency.format(reservation.membership_discount) + ' de descuento en tu cuota de socio.' : '') +
           (reservation.pending_installment_discount > 0
             ? ' Al validar el justificante, se aplicará un ajuste de ' + currency.format(reservation.pending_installment_discount) + ' en la última cuota de la inscripción.' : '')
           : 'Cuota anual general: 35 €.')
@@ -202,16 +141,12 @@ receiptStep.onsubmit = async event => {
     });
     const response = await fetch(api, {
       method: 'POST',
-      headers: {apikey: key, 'Content-Type': 'application/json',
-        ...(draft.authorization ? {Authorization: 'Bearer ' + draft.authorization} : {})},
+      headers: {apikey: key, 'Content-Type': 'application/json'},
       body: JSON.stringify({...draft.submission, p_receipt: encoded}),
       signal: AbortSignal.timeout(20000),
     });
     if (!response.ok) {
       const failure = await response.json().catch(() => ({}));
-      if (response.status === 401 && draft.authorization) {
-        throw Error('La sesión ha caducado. Vuelve a editar y consulta de nuevo con la misma cuenta para recuperar tu reserva.');
-      }
       if (failure.message === 'No se pudo tramitar la solicitud' || failure.code === '23505') {
         throw Error('Ya hay una solicitud de alta o renovación para este documento en 2027/2028. Contacta con el club si necesitas corregirla.');
       }
@@ -229,6 +164,7 @@ receiptStep.onsubmit = async event => {
     if (typeof reference !== 'string' || !reference.startsWith('SOCIO-PRUEBA-')) {
       throw Error('No se pudo confirmar la recepción. Puedes volver a intentar el mismo envío.');
     }
+    reviewRequestId = crypto.randomUUID();
     profile.reset();
     renewal.reset();
     selectMode();
