@@ -2,6 +2,14 @@
 <html lang="es">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+if (location.origin === 'https://andresservant9.github.io') {
+  const destination = new URL(location.pathname.replace(/^\/inscripcion-bm-pinto(?=\/|$)/, '') || '/', 'https://inscripcion-bm-pinto.pages.dev');
+  destination.search = location.search;
+  destination.hash = location.hash;
+  location.replace(destination.href);
+}
+</script>
 <title>Mis inscripciones · Club Balonmano Pinto</title>
 <style>
   body { margin: 0; background: #f4f2ee; color: #222; font: 1rem system-ui, sans-serif; }
@@ -16,6 +24,7 @@
 </style>
 <main>
   <header>Club Balonmano Pinto<h1>Mis inscripciones</h1></header>
+  <nav aria-label="Inscripciones del club"><p><a href="index.html">Volver al formulario de inscripción</a></p></nav>
   <form id="signin">
     <label>Correo <input type="email" name="email" autocomplete="username" required></label>
     <label>Contraseña <input type="password" name="password" autocomplete="current-password" required></label>
@@ -23,10 +32,29 @@
   </form>
   <p id="message" role="status"></p>
   <section id="family" hidden>
+    <button id="refreshEnrollments" type="button">Actualizar estado de los pagos</button>
     <button id="signout" type="button">Cerrar sesión</button>
+    <label>Mostrar cuotas
+      <select id="familyPaymentFilter">
+        <option value="">Todas</option>
+        <option value="pending">Pendientes</option>
+        <option value="in_review">En revisión</option>
+        <option value="confirmed">Confirmadas</option>
+      </select>
+    </label>
+    <p id="familyFilterEmpty" role="status" hidden>No hay cuotas con ese estado.</p>
+    <p id="membershipDiscount" hidden></p>
     <div id="enrollments"></div>
   </section>
 </main>
-<script src="mis-inscripciones.js?v=a287a4f834ec" defer></script>
+<script src="mis-inscripciones.js?v=71f03c84dfdf" defer></script>
 </html>
+
+
+
+
+
+
+
+
 
