@@ -30,9 +30,26 @@
 <div class="review-actions">
 <button type="button" class="secondary" id="editRegistration">Volver a editar</button>
 <fieldset id="registrationAccount">
-<legend>Guardar en Mis inscripciones</legend>
-<label><input type="checkbox" id="linkRegistration"> Vincular a mi cuenta de la tienda</label>
-<div id="registrationCredentials" hidden>
+<legend>Cuenta del club (obligatoria)</legend>
+<p>Entra con tu cuenta del club para guardar la inscripción.</p>
+<details id="createRegistrationAccount">
+<summary>Crear cuenta del club</summary>
+<form id="registrationSignup">
+<label>Nombre completo<input name="fullName" autocomplete="name" required></label>
+<label>Teléfono<input name="phone" type="tel" autocomplete="tel" required></label>
+<label>DNI o NIE<input name="identifier" required></label>
+<label>Correo<input name="email" type="email" autocomplete="email" required></label>
+<label>Contraseña<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+<label>Repetir contraseña<input name="repeat" type="password" autocomplete="new-password" minlength="8" required></label>
+<button>Enviar código de verificación</button>
+</form>
+<form id="registrationVerify" hidden>
+<label>Código del correo<input name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
+<button>Verificar correo</button>
+</form>
+<p id="registrationSignupStatus" role="status"></p>
+</details>
+<div>
 <label>Correo de la cuenta <input type="email" id="registrationEmail" autocomplete="username"></label>
 <label>Contraseña <input type="password" id="registrationPassword" autocomplete="current-password"></label>
 <label id="firstReceiptField" hidden><span id="firstReceiptLabel"></span>
@@ -115,8 +132,11 @@
 <p><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es" target="_blank" rel="noopener noreferrer">Reglamento General de Protección de Datos</a> · <a href="https://boe.es/eli/es/lo/2018/12/05/3/con" target="_blank" rel="noopener noreferrer">Ley Orgánica 3/2018</a></p>
 <form method="dialog"><button autofocus>Cerrar</button></form>
 </dialog>
-<script src="inscripcion.js?v=c6455152532a"></script>
+<script src="inscripcion.js?v=284128e6e33b"></script>
 </html>
+
+
+
 
 
 

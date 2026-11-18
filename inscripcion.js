@@ -44,8 +44,6 @@ if (typeof document !== 'undefined') {
   const confirmRegistration = document.querySelector('#confirmRegistration');
   const printRegistration = document.querySelector('#printRegistration');
   const accountFields = document.querySelector('#registrationAccount');
-  const linkRegistration = document.querySelector('#linkRegistration');
-  const credentials = document.querySelector('#registrationCredentials');
   const accountEmail = document.querySelector('#registrationEmail');
   const accountPassword = document.querySelector('#registrationPassword');
   const openMyRegistrations = document.querySelector('#openMyRegistrations');
@@ -59,15 +57,10 @@ if (typeof document !== 'undefined') {
   }
   function updateFirstReceipt() {
     const amount = firstReceiptAmount(reviewedRegistration);
-    firstReceiptField.hidden = !linkRegistration.checked || amount <= 0;
+    firstReceiptField.hidden = amount <= 0;
     firstReceiptLabel.textContent = 'Justificante de prueba del primer pago (' +
       new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount) + ') · PDF, JPG o PNG, máximo 5 MB';
   }
-  linkRegistration.onchange = () => {
-    credentials.hidden = !linkRegistration.checked;
-    if (!linkRegistration.checked) accountPassword.value = '';
-    updateFirstReceipt();
-  };
 
   document.querySelector('#editRegistration').onclick = () => {
     summary.hidden = true;
@@ -75,6 +68,85 @@ if (typeof document !== 'undefined') {
   };
   const registrationApi = 'https://dfwnzfznhnkcqrdcydnx.supabase.co/rest/v1/rpc/bm_pinto_submit_registration_test';
   const publishableKey = 'sb_publishable_U3568BhgdgCt7ysDU5l1CA_1CenKkjU';
+  const signup = document.querySelector('#registrationSignup');
+  const verify = document.querySelector('#registrationVerify');
+  const signupStatus = document.querySelector('#registrationSignupStatus');
+  let pendingAccount;
+  let clubSession;
+  async function accountRequest(path, body, token) {
+    const headers = {apikey: publishableKey, 'Content-Type': 'application/json'};
+    if (token) headers.Authorization = 'Bearer ' + token;
+    const response = await fetch(new URL(path, registrationApi), {
+      method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(15000),
+    });
+    return {ok: response.ok, data: await response.json().catch(() => ({}))};
+  }
+  signup.onsubmit = async event => {
+    event.preventDefault();
+    const button = signup.querySelector('button');
+    if (button.disabled) return;
+    const fields = new FormData(signup);
+    const email = fields.get('email').trim().toLowerCase();
+    const password = fields.get('password');
+    const identifier = fields.get('identifier').replace(/[\s.-]/g, '').toUpperCase();
+    const name = fields.get('fullName').trim();
+    const phone = fields.get('phone').trim();
+    if (!name || !phone || !/^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Z]$/.test(identifier) || password !== fields.get('repeat')) {
+      signupStatus.textContent = 'Revisa el nombre, el teléfono, el DNI/NIE y que las contraseñas coincidan.';
+      return;
+    }
+    button.disabled = true;
+    signupStatus.textContent = 'Solicitando código…';
+    try {
+      const {ok, data} = await accountRequest('/auth/v1/signup', {
+        email, password, data: {store_name: name, store_phone: phone},
+      });
+      if (['user_already_exists', 'email_exists'].includes(data.code) || data.identities?.length === 0) {
+        accountEmail.value = email;
+        throw Error('Ese correo ya está registrado. Inicia sesión con tu cuenta del club.');
+      }
+      if (!ok) throw Error('No se pudo crear la cuenta. Comprueba los datos o inténtalo más tarde.');
+      pendingAccount = {email, identifier};
+      signup.reset();
+      signup.hidden = true;
+      verify.hidden = false;
+      signupStatus.textContent = 'Introduce el código que hemos enviado a tu correo.';
+      verify.elements.code.focus();
+    } catch (error) {
+      signupStatus.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  };
+  verify.onsubmit = async event => {
+    event.preventDefault();
+    const button = verify.querySelector('button');
+    if (!pendingAccount || button.disabled) return;
+    button.disabled = true;
+    try {
+      if (!pendingAccount.token) {
+        const result = await accountRequest('/auth/v1/verify', {
+          email: pendingAccount.email, token: verify.elements.code.value.trim(), type: 'email',
+        });
+        if (!result.ok || !result.data.access_token) throw Error('El código es incorrecto o ha caducado.');
+        pendingAccount.token = result.data.access_token;
+      }
+      const saved = await accountRequest('/rest/v1/rpc/bm_pinto_save_customer_identifier',
+        {identifier: pendingAccount.identifier}, pendingAccount.token);
+      if (!saved.ok) throw Error('Correo verificado. Pulsa Verificar correo para reintentar el guardado del DNI/NIE.');
+      clubSession = {email: pendingAccount.email, token: pendingAccount.token};
+      accountEmail.value = clubSession.email;
+      pendingAccount = null;
+      verify.reset();
+      verify.hidden = true;
+      signupStatus.textContent = 'Cuenta del club verificada. Ya puedes enviar la inscripción.';
+      document.querySelector('#createRegistrationAccount summary').textContent = 'Cuenta del club creada';
+    } catch (error) {
+      signupStatus.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  };
   let reviewedRegistration = null;
   let reviewedPayload = '';
   let registrationKey = '';
@@ -82,10 +154,10 @@ if (typeof document !== 'undefined') {
   confirmRegistration.onclick = async () => {
     if (!reviewedRegistration || registrationSending) return;
     const registration = reviewedRegistration;
-    const linked = linkRegistration.checked;
-    const needsReceipt = linked && firstReceiptAmount(registration) > 0;
+    const needsReceipt = firstReceiptAmount(registration) > 0;
     const file = firstReceipt.files[0];
-    if (linked && (!accountEmail.value.trim() || !accountEmail.checkValidity() || !accountPassword.value)) {
+    const existingSession = clubSession?.email === accountEmail.value.trim().toLowerCase() && clubSession;
+    if (!existingSession && (!accountEmail.value.trim() || !accountEmail.checkValidity() || !accountPassword.value)) {
       reviewStatus.textContent = 'Introduce el correo y la contraseña de tu cuenta de la tienda.';
       return;
     }
@@ -102,16 +174,15 @@ if (typeof document !== 'undefined') {
       const headers = {apikey: publishableKey, 'Content-Type': 'application/json'};
       let endpoint = registrationApi;
       const payload = {submission_id: registration.id, submission: registration.data};
-      if (linked) {
+      {
         const loginUrl = new URL('/auth/v1/token?grant_type=password', registrationApi);
-        const login = await fetch(loginUrl, {
+        const login = existingSession ? null : await fetch(loginUrl, {
           method: 'POST', headers,
           body: JSON.stringify({email: accountEmail.value.trim(), password: accountPassword.value}),
           signal: AbortSignal.timeout(15000),
         });
-        if (!login.ok) throw Error('No se pudo iniciar sesión. Comprueba el correo y la contraseña.');
-        const session = await login.json();
-        headers.Authorization = 'Bearer ' + session.access_token;
+        if (login && !login.ok) throw Error('No se pudo iniciar sesión. Comprueba el correo y la contraseña.');
+        headers.Authorization = 'Bearer ' + (existingSession ? existingSession.token : (await login.json()).access_token);
         endpoint = registrationApi.replace('bm_pinto_submit_registration_test', 'bm_pinto_submit_owned_registration_with_receipt');
         payload.first_receipt = needsReceipt ? await new Promise((resolve, reject) => {
           const reader = new FileReader();
@@ -126,16 +197,19 @@ if (typeof document !== 'undefined') {
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(15000),
       });
-      if (!response.ok) throw Error('No se pudo enviar la prueba. Puedes reintentar el mismo envío.');
+      if (!response.ok) {
+        if (response.status === 401) clubSession = null;
+        throw Error('No se pudo enviar la prueba. Puedes reintentar el mismo envío.');
+      }
       const reference = await response.json();
       if (typeof reference !== 'string' || !reference.startsWith('INS-PRUEBA-')) throw Error('No se pudo comprobar la recepción.');
       if (reviewedRegistration?.id !== registration.id) return;
       reviewStatus.textContent = 'Prueba recibida por el club. Referencia ' + reference + '.' +
-        (linked ? ' Ya está disponible en Mis inscripciones.' : '') +
+        ' Ya está disponible en Mis inscripciones.' +
         (needsReceipt ? ' Justificante recibido para revisión.' : '');
       firstReceipt.value = '';
       accountFields.hidden = true;
-      openMyRegistrations.hidden = !linked;
+      openMyRegistrations.hidden = false;
       confirmRegistration.hidden = true;
       printRegistration.hidden = false;
       printRegistration.focus();
@@ -412,4 +486,6 @@ if (typeof document !== 'undefined') {
     summary.focus();
   };
 }
+
+
 
