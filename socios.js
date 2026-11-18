@@ -169,11 +169,11 @@ for (const form of [profile, renewal]) {
     draft = {submission: {p_id: reservation?.id ?? requestId, p_identifier: normalized, p_kind: kind, p_profile: data}, authorization};
     requestSummary.textContent = kind === 'new'
       ? data.fullName + ' · ' + data.email + ' · ' +
-        (reservation ? 'Importe a transferir (prueba): ' + currency.format(reservation.base_fee - reservation.membership_discount) + '.' +
+        (reservation ? 'Importe a transferir: ' + currency.format(reservation.base_fee - reservation.membership_discount) + '.' +
           (reservation.pending_installment_discount > 0
             ? ' Al validar el justificante, se aplicará un ajuste de ' + currency.format(reservation.pending_installment_discount) + ' en la última cuota de la inscripción.' : '')
-          : 'Cuota anual general de prueba: 35 €.')
-      : 'Renovación comprobada en el padrón de 2026/2027 · Cuota anual general de prueba: 35 €.';
+          : 'Cuota anual general: 35 €.')
+      : 'Renovación comprobada en el padrón de 2026/2027 · Cuota anual general: 35 €.';
     clearStatus();
     form.hidden = true;
     receiptStep.hidden = false;
@@ -192,7 +192,7 @@ receiptStep.onsubmit = async event => {
   }
   const controls = [...receiptStep.elements, ...choices];
   controls.forEach(control => { control.disabled = true; });
-  statusMessage.textContent = 'Enviando solicitud de prueba…';
+  statusMessage.textContent = 'Enviando solicitud…';
   try {
     const encoded = await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -233,7 +233,7 @@ receiptStep.onsubmit = async event => {
     renewal.reset();
     selectMode();
     statusMessage.hidden = false;
-    statusMessage.textContent = 'Solicitud de prueba recibida. Pendiente de revisión por el club. Referencia ' + reference + '.';
+    statusMessage.textContent = 'Solicitud recibida. Pendiente de revisión por el club. Referencia ' + reference + '.';
   } catch (error) {
     statusMessage.textContent = error instanceof TypeError || error.name === 'TimeoutError'
       ? 'No se pudo confirmar el envío. Revisa la conexión y vuelve a intentar el mismo envío.'
