@@ -112,7 +112,7 @@ if (typeof document !== 'undefined') {
 
   document.querySelector('#editRegistration').onclick = () => {
     summary.hidden = true;
-    form.elements.contact.focus();
+    container.querySelector('[name="playerName"]').focus();
   };
   const registrationApi = 'https://dfwnzfznhnkcqrdcydnx.supabase.co/rest/v1/rpc/bm_pinto_submit_registration_test';
   const publishableKey = 'sb_publishable_U3568BhgdgCt7ysDU5l1CA_1CenKkjU';
@@ -121,6 +121,24 @@ if (typeof document !== 'undefined') {
   const signupStatus = document.querySelector('#registrationSignupStatus');
   let pendingAccount;
   let clubSession;
+  function prefillAccount() {
+    const values = {
+      fullName: form.elements.contact.value.trim(),
+      phone: form.elements.phone.value.trim(),
+      identifier: form.elements.contactIdentifier.value.trim(),
+      email: form.elements.email.value.trim(),
+    };
+    for (const [name, value] of Object.entries(values)) {
+      const input = signup.elements[name];
+      if (!input.value || input.value === input.dataset.contactValue) {
+        input.value = value;
+        input.dataset.contactValue = value;
+      }
+    }
+  }
+  document.querySelector('#createRegistrationAccount').addEventListener('toggle', event => {
+    if (event.currentTarget.open) prefillAccount();
+  });
   async function accountRequest(path, body, token) {
     const headers = {apikey: publishableKey, 'Content-Type': 'application/json'};
     if (token) headers.Authorization = 'Bearer ' + token;
@@ -321,11 +339,47 @@ if (typeof document !== 'undefined') {
   const euro = new Intl.NumberFormat('es-ES', {style:'currency',currency:'EUR'});
   const field = (player, name) => player.querySelector('[name="' + name + '"]');
   const sizes = ['2XS','XS','S','M','L','XL','2XL','3XL'];
+  let contactMode;
+  let guardianContact = {name: '', identifier: ''};
+  function updateContact() {
+    const players = [...container.children];
+    const dated = players.filter(player => ageOnDate(field(player, 'birth').value) !== null);
+    const minor = dated.some(player => ageOnDate(field(player, 'birth').value) < 18);
+    const mode = minor ? 'guardian' : dated.length ? 'adult' : null;
+    const fields = document.querySelector('#contactFields');
+    fields.hidden = !mode;
+    for (const name of ['contact', 'contactIdentifier', 'email', 'phone']) form.elements[name].disabled = !mode;
+    if (!mode) return;
+    if (contactMode === 'guardian' && mode !== 'guardian') {
+      guardianContact = {name: form.elements.contact.value, identifier: form.elements.contactIdentifier.value};
+    }
+    if (mode === 'guardian' && contactMode !== 'guardian') {
+      form.elements.contact.value = guardianContact.name;
+      form.elements.contactIdentifier.value = guardianContact.identifier;
+    }
+    if (mode === 'adult') {
+      form.elements.contact.value = field(dated[0], 'playerName').value;
+      form.elements.contactIdentifier.value = field(dated[0], 'playerId').value;
+    }
+    contactMode = mode;
+    for (const [id, name] of [['contactNameField', 'contact'], ['contactIdentifierField', 'contactIdentifier']]) {
+      document.querySelector('#' + id).hidden = !minor;
+      form.elements[name].readOnly = !minor;
+    }
+    document.querySelector('#contactLegend').textContent = minor ? 'Padre/Madre/Tutor' : 'Datos de contacto del jugador';
+    document.querySelector('#contactHelp').textContent = minor
+      ? 'Introduce los datos del Padre/Madre/Tutor responsable de los menores. Los usaremos también si creas una cuenta del club.'
+      : 'Datos de contacto de ' + (form.elements.contact.value || 'la persona inscrita') + '. Para crear la cuenta usaremos su nombre y DNI/NIE, que ya has indicado arriba.';
+    document.querySelector('#memberLabel').textContent = minor
+      ? 'El jugador o su Padre/Madre/Tutor ya es socio del club'
+      : 'El jugador ya es socio del club';
+  }
   function renumber() {
     [...container.children].forEach((player, index) => {
       player.querySelector('legend').textContent = 'Jugador ' + (index + 1);
       player.querySelector('.remove').hidden = container.children.length === 1;
     });
+    updateContact();
   }
   function updatePlayer(player) {
     const category = categoryFor(field(player, 'birth').value);
@@ -346,10 +400,6 @@ if (typeof document !== 'undefined') {
     const playerId = field(player, 'playerId');
     playerId.disabled = noPlayerId.checked;
     playerId.required = !noPlayerId.checked;
-    const guardianId = field(player, 'guardianId');
-    guardianId.disabled = !minor;
-    guardianId.required = minor;
-    player.querySelector('.guardian-id').hidden = !minor;
     const reportHealth = field(player, 'hasHealth').value === 'yes';
     const health = field(player, 'health');
     health.disabled = !reportHealth;
@@ -377,6 +427,7 @@ if (typeof document !== 'undefined') {
     for (const name of ['shirt', 'shorts']) {
       field(player, name).disabled = !needsKit || field(player, 'fitted').checked;
     }
+    updateContact();
   }
   function addPlayer() {
     const player = document.querySelector('#player').content.firstElementChild.cloneNode(true);
@@ -388,6 +439,7 @@ if (typeof document !== 'undefined') {
     const dateParts = [today.getFullYear(), today.getMonth() + 1, today.getDate()];
     field(player, 'birth').max = dateParts.map(part => String(part).padStart(2, '0')).join('-');
     player.addEventListener('change', () => updatePlayer(player));
+    player.addEventListener('input', () => updateContact());
     player.querySelector('.remove').onclick = () => {
       player.remove();
       renumber();
@@ -402,7 +454,6 @@ if (typeof document !== 'undefined') {
   document.querySelector('#fillTestRegistration').onclick = () => {
     const choose = options => options[Math.floor(Math.random() * options.length)];
     const code = () => String(100000 + Math.floor(Math.random() * 900000));
-    form.elements.contact.value = 'Responsable de prueba ' + code();
     form.elements.phone.value = '000' + code();
     form.elements.member.checked = false;
     form.elements.payment.value = 'split';
@@ -414,7 +465,6 @@ if (typeof document !== 'undefined') {
         birth: choose(['2011', '2013', '2015', '2017']) + '-' + choose(['02', '05', '09']) + '-15',
         division: choose(['female', 'male']),
         playerId: 'PRUEBA' + suffix,
-        guardianId: 'TUTOR' + suffix,
         address: 'Domicilio ficticio ' + suffix,
         town,
         otherTown: '',
@@ -434,6 +484,8 @@ if (typeof document !== 'undefined') {
       field(player, 'fitted').checked = false;
       updatePlayer(player);
     }
+    form.elements.contact.value = 'Responsable de prueba ' + code();
+    form.elements.contactIdentifier.value = '00000000T';
     summary.hidden = true;
     document.querySelector('#testRegistrationStatus').textContent =
       'Datos ficticios rellenados. Revisa el correo y pulsa Revisar inscripción.';
@@ -443,6 +495,8 @@ if (typeof document !== 'undefined') {
   form.addEventListener('input', () => {summary.hidden = true;});
   form.onsubmit = event => {
     event.preventDefault();
+    updateContact();
+    prefillAccount();
     const players = [...container.children].map(player => ({
       name: field(player, 'playerName').value.trim(),
       birth: field(player, 'birth').value,
@@ -566,7 +620,7 @@ if (typeof document !== 'undefined') {
       players: [...container.children].map((player, index) => ({
         birth: field(player, 'birth').value,
         playerId: field(player, 'playerId').disabled ? '' : field(player, 'playerId').value.trim(),
-        guardianId: field(player, 'guardianId').disabled ? '' : field(player, 'guardianId').value.trim(),
+        guardianId: ageOnDate(field(player, 'birth').value) < 18 ? form.elements.contactIdentifier.value.trim() : '',
         address: field(player, 'address').value.trim(),
         town: players[index].town,
         registeredInPinto: players[index].registeredInPinto,
@@ -590,6 +644,7 @@ if (typeof document !== 'undefined') {
     summary.focus();
   };
 }
+
 
 
 
