@@ -49,8 +49,13 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
   </form>
   <p id="message" role="status"></p>
   <section id="family" hidden>
-    <button id="refreshEnrollments" type="button">Actualizar estado de los pagos</button>
+    <button id="refreshEnrollments" type="button">Actualizar estado</button>
     <button id="signout" type="button">Cerrar sesión</button>
+    <section aria-labelledby="membershipRequestsTitle">
+      <h2 id="membershipRequestsTitle">Mis solicitudes de socio</h2>
+      <p id="membershipRequestsStatus" role="status"></p>
+      <div id="membershipRequests"></div>
+    </section>
     <label>Mostrar cuotas
       <select id="familyPaymentFilter">
         <option value="">Todas</option>
@@ -64,7 +69,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
     <div id="enrollments"></div>
   </section>
 </main>
-<script src="mis-inscripciones.js?v=71f03c84dfdf" defer></script>
+<script src="mis-inscripciones.js?v=mis-socios-79" defer></script>
 </html>
 
 
