@@ -840,7 +840,8 @@ get('loadMembershipRequests').onclick = async () => {
       const title = request.kind === 'renew'
         ? ['Renovación', request.profile?.fullName].filter(Boolean).join(' · ')
         : 'Alta · ' + request.profile.fullName;
-      const result = item('p', request.rejected_at ? 'Rechazada' : request.approved_at ? 'Validada' : 'Pendiente de revisión');
+      const result = item('p', request.rejected_at ? 'Rechazada' : request.approved_at ? 'Validada' :
+        request.awaiting_receipt ? 'Descuento reservado · Pendiente de justificante' : 'Pendiente de revisión');
       const discounts = item('p', '');
       function showMembershipDiscounts(data) {
         const fee = Number(data.membership_discount || 0);
@@ -888,9 +889,10 @@ get('loadMembershipRequests').onclick = async () => {
       }
       const download = item('button', 'Descargar justificante');
       download.type = 'button';
+      download.hidden = Boolean(request.awaiting_receipt);
       const approve = item('button', 'Validar solicitud de prueba');
       approve.type = 'button';
-      approve.hidden = Boolean(request.approved_at || request.rejected_at ||
+      approve.hidden = Boolean(request.approved_at || request.rejected_at || request.awaiting_receipt ||
         (request.kind === 'renew' && (!request.previous_member || !request.profile?.email)));
       const rejectRequest = item('button', 'Rechazar solicitud de prueba');
       rejectRequest.type = 'button';
