@@ -9,6 +9,8 @@
 <p>Prototipo con datos ficticios. Las cuotas, fechas y años de nacimiento son orientativos.</p>
 <button type="button" data-privacy>Leer el aviso de privacidad</button>
 <form id="registration">
+<button type="button" class="secondary" id="fillTestRegistration">Rellenar con datos ficticios</button>
+<small id="testRegistrationStatus" role="status"></small>
 <fieldset><legend>Responsable de contacto</legend><div class="grid">
 <label>Nombre completo<input name="contact" required></label>
 <label>Correo electrónico<input type="email" name="email" required></label>
@@ -33,6 +35,8 @@
 <div id="registrationCredentials" hidden>
 <label>Correo de la cuenta <input type="email" id="registrationEmail" autocomplete="username"></label>
 <label>Contraseña <input type="password" id="registrationPassword" autocomplete="current-password"></label>
+<label id="firstReceiptField" hidden><span id="firstReceiptLabel"></span>
+<input type="file" id="firstReceipt" accept=".pdf,.jpg,.jpeg,.png"></label>
 </div>
 </fieldset>
 <button type="button" id="confirmRegistration">Enviar inscripción de prueba</button>
@@ -111,6 +115,8 @@
 <p><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es" target="_blank" rel="noopener noreferrer">Reglamento General de Protección de Datos</a> · <a href="https://boe.es/eli/es/lo/2018/12/05/3/con" target="_blank" rel="noopener noreferrer">Ley Orgánica 3/2018</a></p>
 <form method="dialog"><button autofocus>Cerrar</button></form>
 </dialog>
-<script src="inscripcion.js?v=d78a58e3595d"></script>
+<script src="inscripcion.js?v=c6455152532a"></script>
 </html>
+
+
 

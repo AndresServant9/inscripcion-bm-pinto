@@ -49,9 +49,24 @@ if (typeof document !== 'undefined') {
   const accountEmail = document.querySelector('#registrationEmail');
   const accountPassword = document.querySelector('#registrationPassword');
   const openMyRegistrations = document.querySelector('#openMyRegistrations');
+  const firstReceipt = document.querySelector('#firstReceipt');
+  const firstReceiptField = document.querySelector('#firstReceiptField');
+  const firstReceiptLabel = document.querySelector('#firstReceiptLabel');
+  function firstReceiptAmount(registration) {
+    const data = registration?.data;
+    if (!data?.players.some(player => !player.hasKit && player.team !== 'national')) return 0;
+    return data.payment === 'single' ? data.total : data.players.reduce((total, player) => total + player.payments[0], 0);
+  }
+  function updateFirstReceipt() {
+    const amount = firstReceiptAmount(reviewedRegistration);
+    firstReceiptField.hidden = !linkRegistration.checked || amount <= 0;
+    firstReceiptLabel.textContent = 'Justificante de prueba del primer pago (' +
+      new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount) + ') · PDF, JPG o PNG, máximo 5 MB';
+  }
   linkRegistration.onchange = () => {
     credentials.hidden = !linkRegistration.checked;
     if (!linkRegistration.checked) accountPassword.value = '';
+    updateFirstReceipt();
   };
 
   document.querySelector('#editRegistration').onclick = () => {
@@ -68,8 +83,15 @@ if (typeof document !== 'undefined') {
     if (!reviewedRegistration || registrationSending) return;
     const registration = reviewedRegistration;
     const linked = linkRegistration.checked;
+    const needsReceipt = linked && firstReceiptAmount(registration) > 0;
+    const file = firstReceipt.files[0];
     if (linked && (!accountEmail.value.trim() || !accountEmail.checkValidity() || !accountPassword.value)) {
       reviewStatus.textContent = 'Introduce el correo y la contraseña de tu cuenta de la tienda.';
+      return;
+    }
+    if (needsReceipt && (!file?.size || file.size > 5 * 1024 * 1024)) {
+      reviewStatus.textContent = 'Adjunta un justificante de prueba de hasta 5 MB para el primer pago.';
+      firstReceipt.focus();
       return;
     }
     registrationSending = true;
@@ -79,6 +101,7 @@ if (typeof document !== 'undefined') {
     try {
       const headers = {apikey: publishableKey, 'Content-Type': 'application/json'};
       let endpoint = registrationApi;
+      const payload = {submission_id: registration.id, submission: registration.data};
       if (linked) {
         const loginUrl = new URL('/auth/v1/token?grant_type=password', registrationApi);
         const login = await fetch(loginUrl, {
@@ -89,12 +112,18 @@ if (typeof document !== 'undefined') {
         if (!login.ok) throw Error('No se pudo iniciar sesión. Comprueba el correo y la contraseña.');
         const session = await login.json();
         headers.Authorization = 'Bearer ' + session.access_token;
-        endpoint = registrationApi.replace('bm_pinto_submit_registration_test', 'bm_pinto_submit_owned_registration_test');
+        endpoint = registrationApi.replace('bm_pinto_submit_registration_test', 'bm_pinto_submit_owned_registration_with_receipt');
+        payload.first_receipt = needsReceipt ? await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(',')[1]);
+          reader.onerror = () => reject(Error('No se pudo leer el justificante.'));
+          reader.readAsDataURL(file);
+        }) : null;
       }
       const response = await fetch(endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify({submission_id: registration.id, submission: registration.data}),
+        body: JSON.stringify(payload),
         signal: AbortSignal.timeout(15000),
       });
       if (!response.ok) throw Error('No se pudo enviar la prueba. Puedes reintentar el mismo envío.');
@@ -102,7 +131,9 @@ if (typeof document !== 'undefined') {
       if (typeof reference !== 'string' || !reference.startsWith('INS-PRUEBA-')) throw Error('No se pudo comprobar la recepción.');
       if (reviewedRegistration?.id !== registration.id) return;
       reviewStatus.textContent = 'Prueba recibida por el club. Referencia ' + reference + '.' +
-        (linked ? ' Ya está disponible en Mis inscripciones.' : '');
+        (linked ? ' Ya está disponible en Mis inscripciones.' : '') +
+        (needsReceipt ? ' Justificante recibido para revisión.' : '');
+      firstReceipt.value = '';
       accountFields.hidden = true;
       openMyRegistrations.hidden = !linked;
       confirmRegistration.hidden = true;
@@ -225,6 +256,46 @@ if (typeof document !== 'undefined') {
     return field(player, 'playerName');
   }
   addPlayer();
+  document.querySelector('#fillTestRegistration').onclick = () => {
+    const choose = options => options[Math.floor(Math.random() * options.length)];
+    const code = () => String(100000 + Math.floor(Math.random() * 900000));
+    form.elements.contact.value = 'Responsable de prueba ' + code();
+    form.elements.phone.value = '000' + code();
+    form.elements.member.checked = false;
+    form.elements.payment.value = 'split';
+    for (const player of container.children) {
+      const suffix = code();
+      const town = choose(['Pinto', 'Valdemoro', 'Leganés']);
+      const values = {
+        playerName: 'Jugador de prueba ' + suffix,
+        birth: choose(['2011', '2013', '2015', '2017']) + '-' + choose(['02', '05', '09']) + '-15',
+        division: choose(['female', 'male']),
+        playerId: 'PRUEBA' + suffix,
+        guardianId: 'TUTOR' + suffix,
+        address: 'Domicilio ficticio ' + suffix,
+        town,
+        otherTown: '',
+        registeredInPinto: town === 'Pinto' ? 'Sí' : 'No',
+        hasKit: 'no',
+        kitRole: choose(['court', 'goalkeeper']),
+        printName: 'PRUEBA ' + suffix,
+        shirt: choose(sizes),
+        shorts: choose(sizes),
+        hasHealth: 'no',
+        outings: choose(['Sí', 'No']),
+        transport: choose(['Sí', 'No']),
+        images: 'No',
+      };
+      for (const [name, value] of Object.entries(values)) field(player, name).value = value;
+      field(player, 'noPlayerId').checked = false;
+      field(player, 'fitted').checked = false;
+      updatePlayer(player);
+    }
+    summary.hidden = true;
+    document.querySelector('#testRegistrationStatus').textContent =
+      'Datos ficticios rellenados. Revisa el correo y pulsa Revisar inscripción.';
+    form.elements.email.focus();
+  };
   document.querySelector('#add').onclick = () => {summary.hidden = true; addPlayer().focus();};
   form.addEventListener('input', () => {summary.hidden = true;});
   form.onsubmit = event => {
@@ -331,6 +402,8 @@ if (typeof document !== 'undefined') {
       registrationKey = crypto.randomUUID();
     }
     reviewedRegistration = undecided ? null : {id: registrationKey, data: testData};
+    firstReceipt.value = '';
+    updateFirstReceipt();
     confirmRegistration.hidden = undecided;
     accountFields.hidden = undecided;
     openMyRegistrations.hidden = true;
