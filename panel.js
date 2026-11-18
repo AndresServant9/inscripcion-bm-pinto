@@ -836,7 +836,7 @@ get('loadMembershipRequests').onclick = async () => {
     const routes = await rpc('bm_pinto_membership_card_routes', {});
     if (token !== session) return;
     list.replaceChildren();
-    status.textContent = requests.length + (requests.length === 1 ? ' solicitud de prueba' : ' solicitudes de prueba');
+    status.textContent = requests.length + (requests.length === 1 ? ' solicitud' : ' solicitudes');
     for (const request of requests) {
       const campaign = routes[request.id]?.campaign === true;
       if (campaign) request.card_state = routes[request.id].state;
@@ -851,8 +851,8 @@ get('loadMembershipRequests').onclick = async () => {
         const fee = Number(data.membership_discount || 0);
         const installment = Number(data.installment_discount || 0);
         discounts.textContent = [
-          fee ? 'Descuento de prueba en la cuota de socio: ' + money.format(fee) + ' · Cuota calculada: ' + money.format(35 - fee) : '',
-          installment ? 'Ajuste de prueba en la última cuota de inscripción: ' + money.format(installment) : '',
+          fee ? 'Descuento en la cuota de socio: ' + money.format(fee) + ' · Cuota calculada: ' + money.format(35 - fee) : '',
+          installment ? 'Ajuste en la última cuota de inscripción: ' + money.format(installment) : '',
         ].filter(Boolean).join(' · ');
       }
       showMembershipDiscounts(request);
@@ -894,7 +894,7 @@ get('loadMembershipRequests').onclick = async () => {
       const download = item('button', 'Descargar justificante');
       download.type = 'button';
       download.hidden = Boolean(request.awaiting_receipt);
-      const approve = item('button', 'Validar solicitud de prueba');
+      const approve = item('button', campaign ? 'Validar solicitud y enviar carné' : 'Validar solicitud de prueba');
       approve.type = 'button';
       approve.hidden = Boolean(request.approved_at || request.rejected_at || request.awaiting_receipt ||
         (request.kind === 'renew' && (!request.previous_member || !request.profile?.email)));
