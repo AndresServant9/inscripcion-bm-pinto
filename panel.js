@@ -837,8 +837,20 @@ get('loadMembershipRequests').onclick = async () => {
     status.textContent = requests.length + (requests.length === 1 ? ' solicitud de prueba' : ' solicitudes de prueba');
     for (const request of requests) {
       const entry = item('li', '');
-      const title = request.kind === 'renew' ? 'Renovación' : 'Alta · ' + request.profile.fullName;
-      const result = item('p', request.approved_at ? 'Validada' : 'Pendiente de revisión');
+      const title = request.kind === 'renew'
+        ? ['Renovación', request.profile?.fullName].filter(Boolean).join(' · ')
+        : 'Alta · ' + request.profile.fullName;
+      const result = item('p', request.rejected_at ? 'Rechazada' : request.approved_at ? 'Validada' : 'Pendiente de revisión');
+      const discounts = item('p', '');
+      function showMembershipDiscounts(data) {
+        const fee = Number(data.membership_discount || 0);
+        const installment = Number(data.installment_discount || 0);
+        discounts.textContent = [
+          fee ? 'Descuento de prueba en la cuota de socio: ' + money.format(fee) + ' · Cuota calculada: ' + money.format(35 - fee) : '',
+          installment ? 'Ajuste de prueba en la última cuota de inscripción: ' + money.format(installment) : '',
+        ].filter(Boolean).join(' · ');
+      }
+      showMembershipDiscounts(request);
       const cardStatus = item('p', {
         sent: 'Carné de prueba enviado.',
         sending: 'Envío en curso o pendiente de comprobar.',
@@ -871,11 +883,34 @@ get('loadMembershipRequests').onclick = async () => {
       sendCard.onclick = sendApprovedCard;
       if (request.kind === 'renew') result.textContent += request.previous_member
         ? ' · Documento en el padrón anterior' : ' · Documento sin coincidencia en el padrón anterior';
+      if (request.kind === 'renew' && request.previous_member && !request.profile?.email) {
+        result.textContent += ' · Falta importar el correo del socio';
+      }
       const download = item('button', 'Descargar justificante');
       download.type = 'button';
       const approve = item('button', 'Validar solicitud de prueba');
       approve.type = 'button';
-      approve.hidden = Boolean(request.approved_at || (request.kind === 'renew' && !request.previous_member));
+      approve.hidden = Boolean(request.approved_at || request.rejected_at ||
+        (request.kind === 'renew' && (!request.previous_member || !request.profile?.email)));
+      const rejectRequest = item('button', 'Rechazar solicitud de prueba');
+      rejectRequest.type = 'button';
+      rejectRequest.className = 'secondary';
+      rejectRequest.hidden = Boolean(request.approved_at || request.rejected_at);
+      rejectRequest.onclick = async () => {
+        if (!window.confirm('¿Rechazar esta solicitud de prueba? El socio podrá enviar una nueva con el mismo documento.')) return;
+        approve.disabled = rejectRequest.disabled = true;
+        try {
+          const rejected = await rpc('bm_pinto_reject_membership_test', {p_id: request.id});
+          if (token !== session || !entry.isConnected) return;
+          if (!rejected) throw Error('La solicitud ya cambió de estado.');
+          result.textContent = 'Rechazada · Se puede enviar una nueva solicitud';
+          approve.hidden = rejectRequest.hidden = true;
+        } catch {
+          if (token === session && entry.isConnected) status.textContent = 'No se pudo rechazar. Consulta de nuevo las solicitudes.';
+        } finally {
+          approve.disabled = rejectRequest.disabled = false;
+        }
+      };
       download.onclick = async () => {
         download.disabled = true;
         try {
@@ -898,22 +933,26 @@ get('loadMembershipRequests').onclick = async () => {
       };
       approve.onclick = async () => {
         if (!window.confirm('¿Has comprobado el ingreso de esta solicitud de prueba?')) return;
-        approve.disabled = true;
+        approve.disabled = rejectRequest.disabled = true;
         try {
           const validated = await rpc('bm_pinto_review_membership_test', {p_id: request.id, p_approve: true});
           if (token !== session || !entry.isConnected) return;
           if (!validated?.approved_at) throw Error('Solicitud no disponible');
           approve.hidden = true;
+          rejectRequest.hidden = true;
           result.textContent = 'Validada';
+          showMembershipDiscounts(validated);
           sendCard.hidden = false;
           await sendApprovedCard();
         } catch {
           if (token === session) status.textContent = 'No se pudo validar la solicitud.';
         } finally {
-          approve.disabled = false;
+          approve.disabled = rejectRequest.disabled = false;
         }
       };
-      entry.append(item('strong', title), item('p', 'Referencia SOCIO-PRUEBA-' + request.id), result, download, ' ', approve, ' ', sendCard, cardStatus);
+      entry.append(item('strong', title), item('p', 'Referencia SOCIO-PRUEBA-' + request.id));
+      if (request.profile?.email) entry.append(item('p', request.profile.email));
+      entry.append(result, discounts, download, ' ', approve, ' ', rejectRequest, ' ', sendCard, cardStatus);
       list.append(entry);
     }
   } catch {
@@ -922,6 +961,65 @@ get('loadMembershipRequests').onclick = async () => {
     loadButton.disabled = false;
   }
 };
+const directoryForm = get('renewalDirectoryImport');
+const directoryStatus = get('renewalDirectoryStatus');
+const saveDirectory = get('saveRenewalDirectory');
+let checkedDirectory = null;
+function resetDirectoryPreview() {
+  checkedDirectory = null;
+  saveDirectory.hidden = true;
+  directoryStatus.textContent = '';
+}
+directoryForm.elements.directory.oninput = resetDirectoryPreview;
+async function importDirectory(preview) {
+  if (!token || !directoryForm.reportValidity()) return;
+  const session = token;
+  const input = directoryForm.elements.directory;
+  const source = input.value.trim();
+  if (!preview && source !== checkedDirectory) return;
+  const [header, ...lines] = source.split(/\r?\n/).filter(line => line.trim());
+  const labels = header.split('\t').map(value => value.trim().toLowerCase());
+  if (labels.length !== 4 || labels[0] !== 'dni' || !['nombre', 'nombre y apellidos'].includes(labels[1]) ||
+    !['correo', 'correo electrónico', 'dirección de correo electrónico'].includes(labels[2]) || labels[3] !== 'temporada') {
+    directoryStatus.textContent = 'La cabecera debe tener DNI, nombre, correo y temporada en ese orden.';
+    return;
+  }
+  if (!lines.length || lines.length > 1000 || lines.some(line => line.split('\t').length !== 4)) {
+    directoryStatus.textContent = 'Copia entre 1 y 1.000 filas con cuatro columnas.';
+    return;
+  }
+  const rows = lines.map(line => {
+    const [identifier, name, email, season] = line.split('\t').map(value => value.trim());
+    return {identifier, name, email, season};
+  });
+  const buttons = [...directoryForm.querySelectorAll('button')];
+  buttons.forEach(button => { button.disabled = true; });
+  input.disabled = true;
+  resetDirectoryPreview();
+  directoryStatus.textContent = preview ? 'Comprobando el padrón…' : 'Importando las coincidencias…';
+  try {
+    const result = await rpc('bm_pinto_import_renewal_directory', {p_rows: rows, p_preview: preview});
+    if (token !== session) return;
+    directoryStatus.textContent = (preview ? 'Filas que coinciden: ' : 'Filas importadas o ya registradas: ') +
+      result.matched_rows + ' · Sin coincidencia: ' + result.unknown_rows + '.';
+    if (preview && result.matched_rows > 0) {
+      checkedDirectory = source;
+      saveDirectory.hidden = false;
+    } else if (!preview) {
+      directoryForm.reset();
+    }
+  } catch (error) {
+    if (token === session) directoryStatus.textContent = error.serverMessage || 'No se pudo comprobar el padrón.';
+  } finally {
+    buttons.forEach(button => { button.disabled = false; });
+    input.disabled = false;
+  }
+}
+directoryForm.onsubmit = event => {
+  event.preventDefault();
+  if (!directoryForm.elements.directory.disabled) importDirectory(true);
+};
+saveDirectory.onclick = () => importDirectory(false);
 const membershipForm = get('membershipRedemption');
 const discountStatus = get('membershipRedemptionStatus');
 membershipForm.elements.email.oninput = () => { discountStatus.textContent = ''; };
@@ -958,6 +1056,8 @@ get('refresh').addEventListener('click', async () => {
 get('logout').addEventListener('click', () => {
   get('membershipRequests').replaceChildren();
   get('membershipRequestStatus').textContent = '';
+  directoryForm.reset();
+  resetDirectoryPreview();
   discountStatus.textContent = '';
   membershipForm.reset();
   revision++;

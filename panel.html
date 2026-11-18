@@ -147,6 +147,18 @@
       <button id="loadMembershipRequests" type="button">Consultar solicitudes</button>
       <p id="membershipRequestStatus" role="status"></p>
       <ul id="membershipRequests"></ul>
+      <details>
+        <summary>Importar padrón para renovaciones</summary>
+        <p>Copia desde la hoja las columnas DNI, nombre, correo y temporada, en ese orden, con la cabecera. Solo se admiten filas de 2026/2027.</p>
+        <form id="renewalDirectoryImport">
+          <label>Datos del padrón anterior <textarea name="directory" rows="5" required></textarea></label>
+          <div class="actions">
+            <button type="submit">Comprobar padrón</button>
+            <button id="saveRenewalDirectory" type="button" hidden>Importar coincidencias</button>
+          </div>
+        </form>
+        <p id="renewalDirectoryStatus" role="status"></p>
+      </details>
     </details>
     <details id="reminders" class="surface">
       <summary>Vista previa de recordatorios de cuotas</summary>
@@ -165,8 +177,12 @@
   </section>
 </main>
 <script src="exportar-packs.js?v=c53ae8de7940" defer></script>
-<script src="panel.js?v=8650be85c6da" defer></script>
+<script src="panel.js?v=75b2b368b84f" defer></script>
 </html>
+
+
+
+
 
 
 

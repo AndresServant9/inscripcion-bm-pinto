@@ -50,6 +50,16 @@
       <label>DNI o NIE del socio <input name="identifier" maxlength="12" required></label>
       <button type="submit">Revisar renovación de prueba</button>
     </form>
+    <details id="discountPreview">
+      <summary>Consultar mi descuento si ya tengo cuenta del club</summary>
+      <p>Vista previa de prueba. Puedes enviar la solicitud sin utilizar esta consulta.</p>
+      <form id="discountLogin">
+        <label>Correo de la cuenta <input type="email" name="email" autocomplete="username" required></label>
+        <label>Contraseña <input type="password" name="password" autocomplete="current-password" required></label>
+        <button>Consultar descuento</button>
+      </form>
+      <p id="discountPreviewStatus" role="status"></p>
+    </details>
     <p id="status" role="status" hidden></p>
     <form id="receiptStep" hidden>
       <h2>Revisar solicitud y adjuntar justificante</h2>
@@ -62,6 +72,9 @@
     </form>
   </section>
 </main>
-<script src="socios.js?v=51c71c4c8cbd" defer></script>
+<script src="socios.js?v=ca1edd6e07eb" defer></script>
 </html>
+
+
+
 
