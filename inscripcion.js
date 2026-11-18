@@ -1,5 +1,6 @@
 const season = {
   year: 2027,
+  singlePaymentCutoff: '2027-07-01',
   dates: ['antes del 1 de julio', 'antes del 15 de septiembre', 'antes del 24 de diciembre'],
   categories: [
     {minBirth: 2020, name: 'Prebenjamín', federated: false, installments: [80,150,150]},
@@ -11,6 +12,16 @@ const season = {
     {minBirth: 0, name: 'Sénior', federated: true, installments: [80,200,160]},
   ],
 };
+function madridDate(now = new Date()) {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now);
+}
+function singlePaymentDeadline(now = new Date()) {
+  return madridDate(now) <= season.singlePaymentCutoff
+    ? 'con vencimiento el 1 de julio de 2027'
+    : 'el día en que envíes la inscripción';
+}
 function categoryFor(date) {
   if (!date || Number(date.slice(0, 4)) > season.year) return null;
   return season.categories.find(category => Number(date.slice(0, 4)) >= category.minBirth);
@@ -22,8 +33,9 @@ function ageOnDate(birth, today = new Date()) {
     (today.getMonth() + 1 === month && today.getDate() < day);
   return today.getFullYear() - year - Number(beforeBirthday);
 }
-function calculate(players, member) {
-  const eligible = players.filter(player => player.team !== 'national');
+function calculate(players, member, day = madridDate()) {
+  const eligible = players.filter(player => player.team !== 'national' && player.category?.name !== 'Sénior' &&
+    player.birth && ageOnDate(player.birth, new Date(day + 'T12:00:00')) < 18);
   const siblings = players.length > 1;
   const lines = players.map(player => {
     const exempt = player.team === 'national';
@@ -31,16 +43,45 @@ function calculate(players, member) {
     const payments = exempt ? [0,0,0] : [...player.category.installments];
     if (player.hasKit) payments[0] = 0;
     payments[2] -= discount;
+    if (!exempt && day >= '2027-12-01') {
+      const month = Number(day.slice(5, 7));
+      const tenths = {12: 8, 1: 7, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2}[month] ?? 2;
+      const annual = player.category.installments[1] + player.category.installments[2];
+      const fixed = !player.category.federated ? 0 :
+        ['Juvenil', 'Sénior'].includes(player.category.name) ? 18760 : 6516;
+      const prorated = Math.round(fixed + (annual * 100 - fixed) * tenths / 10) / 100;
+      payments.splice(0, 3, Math.max(0, prorated + payments[0] - discount), 0, 0);
+    } else if (day >= '2027-09-15') {
+      payments[0] += payments[1];
+      payments[1] = 0;
+    }
     return {...player, discount, payments, total: payments.reduce((sum, value) => sum + value, 0)};
   });
   return {lines, laterDiscount: member ? 0 : Math.min(20, eligible.length * 10)};
 }
-if (typeof module !== 'undefined') module.exports = {categoryFor, calculate};
+function scheduledPayments(amounts, deadlines) {
+  return amounts.map((amount, index) => ({amount, deadline: deadlines[index]}))
+    .filter(payment => payment.amount > 0)
+    .map((payment, index) => ({...payment, label: 'Pago ' + (index + 1)}));
+}
+if (typeof module !== 'undefined') module.exports = {categoryFor, calculate, singlePaymentDeadline, scheduledPayments};
 if (typeof document !== 'undefined') {
   const form = document.querySelector('#registration');
   const container = document.querySelector('#players');
   const summary = document.querySelector('#summary');
+  const proratedSeason = madridDate() >= '2027-12-01';
+  document.querySelector('#splitPaymentOption').hidden = proratedSeason;
+  document.querySelector('#proratedPaymentNote').hidden = !proratedSeason;
   const reviewStatus = document.querySelector('#reviewStatus');
+  function setStatus(element, text, kind = 'error') {
+    element.dataset.kind = kind;
+    element.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    element.textContent = text;
+    if (text && kind === 'error') {
+      element.focus({preventScroll: true});
+      element.scrollIntoView({block: 'center', behavior: 'smooth'});
+    }
+  }
   const confirmRegistration = document.querySelector('#confirmRegistration');
   const printRegistration = document.querySelector('#printRegistration');
   const accountFields = document.querySelector('#registrationAccount');
@@ -50,9 +91,16 @@ if (typeof document !== 'undefined') {
   const firstReceipt = document.querySelector('#firstReceipt');
   const firstReceiptField = document.querySelector('#firstReceiptField');
   const firstReceiptLabel = document.querySelector('#firstReceiptLabel');
+  for (const input of [accountEmail, accountPassword, firstReceipt]) {
+    input.addEventListener('input', () => {
+      input.removeAttribute('aria-invalid');
+      if (reviewStatus.dataset.kind === 'error') setStatus(reviewStatus, '', 'info');
+    });
+  }
   function firstReceiptAmount(registration) {
     const data = registration?.data;
-    if (!data?.players.some(player => !player.hasKit && player.team !== 'national')) return 0;
+    if (!data || (data.registration_day < season.singlePaymentCutoff &&
+      !data.players.some(player => !player.hasKit && player.team !== 'national'))) return 0;
     return data.payment === 'single' ? data.total : data.players.reduce((total, player) => total + player.payments[0], 0);
   }
   function updateFirstReceipt() {
@@ -92,21 +140,21 @@ if (typeof document !== 'undefined') {
     const name = fields.get('fullName').trim();
     const phone = fields.get('phone').trim();
     if (!name || !phone) {
-      signupStatus.textContent = 'Introduce el nombre completo y el teléfono del titular.';
+      setStatus(signupStatus, 'Introduce el nombre completo y el teléfono del titular.');
       return;
     }
     if (!/^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Z]$/.test(identifier)) {
-      signupStatus.textContent = 'Introduce el DNI o NIE completo del titular de la cuenta, incluida la letra.';
+      setStatus(signupStatus, 'Introduce el DNI o NIE completo del titular de la cuenta, incluida la letra.');
       signup.elements.identifier.focus();
       return;
     }
     if (password !== fields.get('repeat')) {
-      signupStatus.textContent = 'Las contraseñas no coinciden.';
+      setStatus(signupStatus, 'Las contraseñas no coinciden.');
       signup.elements.repeat.focus();
       return;
     }
     button.disabled = true;
-    signupStatus.textContent = 'Solicitando código…';
+    setStatus(signupStatus, 'Solicitando código…', 'info');
     try {
       const {ok, data} = await accountRequest('/auth/v1/signup', {
         email, password, data: {store_name: name, store_phone: phone},
@@ -120,10 +168,10 @@ if (typeof document !== 'undefined') {
       signup.reset();
       signup.hidden = true;
       verify.hidden = false;
-      signupStatus.textContent = 'Introduce el código que hemos enviado a tu correo.';
+      setStatus(signupStatus, 'Introduce el código que hemos enviado a tu correo.', 'info');
       verify.elements.code.focus();
     } catch (error) {
-      signupStatus.textContent = error.message;
+      setStatus(signupStatus, error.message);
     } finally {
       button.disabled = false;
     }
@@ -149,10 +197,10 @@ if (typeof document !== 'undefined') {
       pendingAccount = null;
       verify.reset();
       verify.hidden = true;
-      signupStatus.textContent = 'Cuenta del club verificada. Ya puedes enviar la inscripción.';
+      setStatus(signupStatus, 'Cuenta del club verificada. Ya puedes enviar la inscripción.', 'success');
       document.querySelector('#createRegistrationAccount summary').textContent = 'Cuenta del club creada';
     } catch (error) {
-      signupStatus.textContent = error.message;
+      setStatus(signupStatus, error.message);
     } finally {
       button.disabled = false;
     }
@@ -168,22 +216,24 @@ if (typeof document !== 'undefined') {
     const file = firstReceipt.files[0];
     const existingSession = clubSession?.email === accountEmail.value.trim().toLowerCase() && clubSession;
     if (!existingSession && (!accountEmail.value.trim() || !accountEmail.checkValidity() || !accountPassword.value)) {
-      reviewStatus.textContent = 'Introduce el correo y la contraseña de tu cuenta de la tienda.';
+      setStatus(reviewStatus, 'Introduce el correo y la contraseña de tu cuenta del club.');
+      accountEmail.setAttribute('aria-invalid', String(!accountEmail.value.trim() || !accountEmail.checkValidity()));
+      accountPassword.setAttribute('aria-invalid', String(!accountPassword.value));
       return;
     }
     if (needsReceipt && (!file?.size || file.size > 5 * 1024 * 1024)) {
-      reviewStatus.textContent = 'Adjunta un justificante de prueba de hasta 5 MB para el primer pago.';
+      setStatus(reviewStatus, 'Adjunta un justificante de prueba de hasta 5 MB para el primer pago.');
       firstReceipt.focus();
       return;
     }
     registrationSending = true;
     confirmRegistration.disabled = true;
     accountFields.disabled = true;
-    reviewStatus.textContent = 'Enviando inscripción de prueba…';
+    setStatus(reviewStatus, 'Enviando inscripción de prueba…', 'info');
     try {
       const headers = {apikey: publishableKey, 'Content-Type': 'application/json'};
       let endpoint = registrationApi;
-      const payload = {submission_id: registration.id, submission: registration.data};
+      const payload = {submission_id: registration.id, submission: registration.data, p_details: registration.details};
       {
         const loginUrl = new URL('/auth/v1/token?grant_type=password', registrationApi);
         const login = existingSession ? null : await fetch(loginUrl, {
@@ -193,7 +243,7 @@ if (typeof document !== 'undefined') {
         });
         if (login && !login.ok) throw Error('No se pudo iniciar sesión. Comprueba el correo y la contraseña.');
         headers.Authorization = 'Bearer ' + (existingSession ? existingSession.token : (await login.json()).access_token);
-        endpoint = registrationApi.replace('bm_pinto_submit_registration_test', 'bm_pinto_submit_owned_registration_with_receipt');
+        endpoint = registrationApi.replace('bm_pinto_submit_registration_test', 'bm_pinto_submit_registration_test_details');
         payload.first_receipt = needsReceipt ? await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result).split(',')[1]);
@@ -209,14 +259,23 @@ if (typeof document !== 'undefined') {
       });
       if (!response.ok) {
         if (response.status === 401) clubSession = null;
+        const failure = await response.json().catch(() => ({}));
+        if (failure.code === 'PGRST202') throw Error('Falta activar el envío de inscripciones en Supabase.');
+        if (failure.message === 'Ficha de prueba incorrecta') throw Error('Revisa los datos de contacto, el domicilio y las autorizaciones.');
+        if (failure.code === '22P02' || failure.message === 'Jugador de prueba incorrecto') {
+          throw Error('No se pudieron validar los datos del pack. Comprueba las tallas y que se haya aplicado el SQL 49 actualizado.');
+        }
+        if (failure.message === 'Formato no admitido' || failure.message === 'Archivo demasiado grande') {
+          throw Error('El justificante debe ser un PDF, JPG o PNG de hasta 5 MB.');
+        }
         throw Error('No se pudo enviar la prueba. Puedes reintentar el mismo envío.');
       }
       const reference = await response.json();
       if (typeof reference !== 'string' || !reference.startsWith('INS-PRUEBA-')) throw Error('No se pudo comprobar la recepción.');
       if (reviewedRegistration?.id !== registration.id) return;
-      reviewStatus.textContent = 'Prueba recibida por el club. Referencia ' + reference + '.' +
+      setStatus(reviewStatus, 'Prueba recibida por el club. Referencia ' + reference + '.' +
         ' Ya está disponible en Mis inscripciones.' +
-        (needsReceipt ? ' Justificante recibido para revisión.' : '');
+        (needsReceipt ? ' Justificante recibido para revisión.' : ''), 'success');
       firstReceipt.value = '';
       accountFields.hidden = true;
       openMyRegistrations.hidden = false;
@@ -224,7 +283,7 @@ if (typeof document !== 'undefined') {
       printRegistration.hidden = false;
       printRegistration.focus();
     } catch (error) {
-      if (reviewedRegistration?.id === registration.id) reviewStatus.textContent = error.message;
+      if (reviewedRegistration?.id === registration.id) setStatus(reviewStatus, error.message);
     } finally {
       registrationSending = false;
       confirmRegistration.disabled = false;
@@ -386,6 +445,7 @@ if (typeof document !== 'undefined') {
     event.preventDefault();
     const players = [...container.children].map(player => ({
       name: field(player, 'playerName').value.trim(),
+      birth: field(player, 'birth').value,
       category: categoryFor(field(player, 'birth').value),
       division: field(player, 'division').value,
       team: field(player, 'team').disabled ? 'standard' : field(player, 'team').value,
@@ -394,6 +454,9 @@ if (typeof document !== 'undefined') {
         'Camiseta ' + field(player, 'shirt').value + ' · Pantalón ' + field(player, 'shorts').value,
       printName: field(player, 'printName').value.trim(),
       kitRole: field(player, 'kitRole').value,
+      fitted: field(player, 'fitted').checked,
+      shirt: field(player, 'shirt').value,
+      shorts: field(player, 'shorts').value,
       town: field(player, 'town').value === 'other' ? field(player, 'otherTown').value.trim() : field(player, 'town').value,
       registeredInPinto: field(player, 'registeredInPinto').value,
       authorizations: [
@@ -403,8 +466,17 @@ if (typeof document !== 'undefined') {
       ],
     }));
     const undecided = players.some(player => !player.team);
-    const calculated = calculate(players, form.elements.member.checked);
-    const payment = form.elements.payment.value;
+    const now = new Date();
+    const day = madridDate(now);
+    if (day > '2028-06-30') {
+      summary.hidden = true;
+      window.alert('La temporada 2027/2028 ya ha finalizado.');
+      return;
+    }
+    const calculated = calculate(players, form.elements.member.checked, day);
+    const payment = day >= '2027-12-01' ? 'single' : form.elements.payment.value;
+    const singleDeadline = singlePaymentDeadline(now);
+    const deadlines = [day >= season.singlePaymentCutoff ? 'el día de la inscripción' : season.dates[0], ...season.dates.slice(1)];
     const list = document.querySelector('#breakdown');
     list.replaceChildren(...players.map((player, index) => {
       const item = document.createElement('li');
@@ -426,10 +498,8 @@ if (typeof document !== 'undefined') {
       item.append(residence);
       if (line && line.total > 0) {
         const payments = payment === 'single'
-          ? [{label: 'Pago único', amount: line.total, deadline: season.dates[0]}]
-          : line.payments.map((amount, index) => ({
-              label: 'Pago ' + (index + 1), amount, deadline: season.dates[index],
-            }));
+          ? [{label: 'Pago único', amount: line.total, deadline: singleDeadline}]
+          : scheduledPayments(line.payments, deadlines);
         const table = document.createElement('ul');
         for (const {label, amount, deadline} of payments.filter(entry => entry.amount > 0)) {
           const row = document.createElement('li');
@@ -459,33 +529,57 @@ if (typeof document !== 'undefined') {
       }
       return item;
     }));
-    const total = calculated.lines.reduce((sum, line) => sum + line.total, 0);
-    const familyPayments = season.dates.map((date, index) => ({
-      date, number: index + 1,
-      amount: calculated.lines.reduce((sum, line) => sum + line.payments[index], 0),
-    }));
-    document.querySelector('#total').textContent = undecided ? 'Total pendiente de confirmar el equipo' : 'Total familiar ' + euro.format(total);
+    const total = Math.round(calculated.lines.reduce((sum, line) => sum + line.total * 100, 0)) / 100;
+    const familyPayments = scheduledPayments(deadlines.map((date, index) =>
+      calculated.lines.reduce((sum, line) => sum + line.payments[index], 0)), deadlines);
+    document.querySelector('#total').textContent = undecided ? 'Total pendiente de confirmar el equipo' : 'TOTAL A PAGAR · ' + euro.format(total);
     document.querySelector('#schedule').textContent = undecided ? '' : payment === 'single'
-      ? 'Pago único de ' + euro.format(total) + ' ' + season.dates[0] + '.'
-      : familyPayments.filter(({amount}) => amount > 0).map(({date, number, amount}) => 'Pago ' + number + ' · ' + euro.format(amount) + ' ' + date).join(' | ');
+      ? 'Pago único de ' + euro.format(total) + ' ' + singleDeadline + '.'
+      : familyPayments.map(({deadline, label, amount}) => label + ' · ' + euro.format(amount) + ' ' + deadline).join(' | ');
     document.querySelector('#membership').textContent = !undecided && calculated.laterDiscount
-      ? 'Si os hacéis socios después de inscribiros, el descuento orientativo en el alta será de ' + euro.format(calculated.laterDiscount) + '.' : '';
-    reviewStatus.textContent = undecided ? 'El equipo está pendiente de confirmar por el club.' : '';
+      ? payment === 'split'
+        ? 'Si os hacéis socios más adelante, el descuento de 10 € por menor elegible se aplicará al último pago pendiente. Si ya están confirmados todos los pagos, se aplicará a la cuota de socio, hasta 20 €.'
+        : 'Si os hacéis socios después de confirmar el pago único, el descuento previsto en el alta es de ' + euro.format(calculated.laterDiscount) + '.'
+      : '';
+    setStatus(reviewStatus, undecided ? 'El equipo está pendiente de confirmar por el club.' : '', 'info');
     const testData = {
+      registration_day: day,
       payment,
       member: form.elements.member.checked,
       total,
       players: calculated.lines.map(line => ({
+        name: line.name.slice(0, 120),
         category: line.category.name, team: line.team, division: line.division, hasKit: line.hasKit,
+        ...(!line.hasKit && { equipment: {
+          role: line.kitRole, printName: line.printName, fitted: line.fitted,
+          shirt: line.fitted ? '' : line.shirt, trousers: line.fitted ? '' : line.shorts,
+        } }),
         payments: line.payments,
       })),
     };
-    const payload = JSON.stringify(testData);
+    const details = {
+      contact: {
+        name: form.elements.contact.value.trim(),
+        email: form.elements.email.value.trim(),
+        phone: form.elements.phone.value.trim(),
+      },
+      players: [...container.children].map((player, index) => ({
+        birth: field(player, 'birth').value,
+        playerId: field(player, 'playerId').disabled ? '' : field(player, 'playerId').value.trim(),
+        guardianId: field(player, 'guardianId').disabled ? '' : field(player, 'guardianId').value.trim(),
+        address: field(player, 'address').value.trim(),
+        town: players[index].town,
+        registeredInPinto: players[index].registeredInPinto,
+        health: field(player, 'health').disabled ? '' : field(player, 'health').value.trim(),
+        authorizations: Object.fromEntries(['outings', 'transport', 'images'].map(name => [name, field(player, name).value])),
+      })),
+    };
+    const payload = JSON.stringify([testData, details]);
     if (payload !== reviewedPayload) {
       reviewedPayload = payload;
       registrationKey = crypto.randomUUID();
     }
-    reviewedRegistration = undecided ? null : {id: registrationKey, data: testData};
+    reviewedRegistration = undecided ? null : {id: registrationKey, data: testData, details};
     firstReceipt.value = '';
     updateFirstReceipt();
     confirmRegistration.hidden = undecided;
