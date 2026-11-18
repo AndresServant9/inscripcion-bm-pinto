@@ -48,15 +48,17 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <form id="registration">
 <button type="button" class="secondary" id="fillTestRegistration">Rellenar con datos ficticios</button>
 <small id="testRegistrationStatus" role="status"></small>
-<fieldset><legend>Responsable de contacto</legend><div class="grid">
-<label>Nombre completo<input name="contact" required></label>
+<div id="players"></div>
+<button type="button" class="secondary" id="add">Añadir otro jugador</button>
+<fieldset id="contactFields" hidden><legend id="contactLegend">Padre/Madre/Tutor</legend>
+<p id="contactHelp">Si inscribes a un menor, introduce los datos de su Padre/Madre/Tutor.</p><div class="grid">
+<label id="contactNameField">Nombre completo<input name="contact" autocomplete="name" required></label>
+<label id="contactIdentifierField">DNI/NIE del Padre/Madre/Tutor<input name="contactIdentifier" maxlength="12" required></label>
 <label>Correo electrónico<input type="email" name="email" required></label>
 <label>Teléfono<input type="tel" name="phone" required></label></div>
 <p class="authorization"><a href="https://chat.whatsapp.com/HCeexWXYCFO7ayt5HTg3wP?s=sw&amp;p=a&amp;iam=2" target="_blank" rel="noopener noreferrer">Entrar al canal de información general del club en WhatsApp</a></p>
-<label><input name="member" type="checkbox"> Al menos un progenitor ya es socio</label>
+<label><input name="member" type="checkbox"> <span id="memberLabel">El jugador o su Padre/Madre/Tutor ya es socio del club</span></label>
 </fieldset>
-<div id="players"></div>
-<button type="button" class="secondary" id="add">Añadir otro jugador</button>
 <fieldset><legend>Forma de pago</legend>
 <label><input type="radio" name="payment" value="single" checked> Pago único</label>
 <small>El pago único vence el 1 de julio de 2027. A partir de esa fecha, vence el día en que envíes la inscripción.</small>
@@ -75,7 +77,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 </div>
 <details id="createRegistrationAccount">
 <summary>No tengo cuenta · Crear cuenta del club</summary>
-<form id="registrationSignup"><p>Rellena tus datos y verifica tu correo para crear la cuenta.</p>
+<form id="registrationSignup"><p>Hemos completado tus datos de contacto. Revísalos, elige una contraseña y verifica tu correo para crear la cuenta.</p>
 <label>Nombre completo<input name="fullName" autocomplete="name" required></label>
 <label>Teléfono<input name="phone" type="tel" autocomplete="tel" required></label>
 <label>DNI o NIE del titular de la cuenta<input name="identifier" aria-describedby="accountIdentifierHelp" required></label>
@@ -117,7 +119,6 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <label>Documento del jugador (DNI/NIE)<input name="playerId" maxlength="12" required></label>
 <label class="no-player-id" hidden><input type="checkbox" name="noPlayerId" disabled> El menor no tiene DNI/NIE</label>
 <p class="player-id-warning" role="status" hidden>Desde los 14 años, la Federación exige al jugador un documento propio para tramitar la ficha. Puedes continuar con la inscripción.</p>
-<label class="guardian-id" hidden>Documento del padre, madre o tutor<input name="guardianId" maxlength="12" disabled></label>
 
 <div class="protocol authorization" hidden><a href="#authorizationDetails" aria-haspopup="dialog"></a></div>
 <div class="grid">
@@ -173,8 +174,9 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <p><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es" target="_blank" rel="noopener noreferrer">Reglamento General de Protección de Datos</a> · <a href="https://boe.es/eli/es/lo/2018/12/05/3/con" target="_blank" rel="noopener noreferrer">Ley Orgánica 3/2018</a></p>
 <form method="dialog"><button autofocus>Cerrar</button></form>
 </dialog>
-<script src="inscripcion.js?v=resumen-pagos-errores-80"></script>
+<script src="inscripcion.js?v=jugadores-contacto-81"></script>
 </html>
+
 
 
 
