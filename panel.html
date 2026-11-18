@@ -29,10 +29,24 @@
     <button id="logout" type="button">Cerrar sesión</button>
     <p id="count" aria-live="polite"></p>
     <ul id="registrations"></ul>
+    <details>
+      <summary>Vista previa de recordatorios de cuotas</summary>
+      <p>Consulta qué cuotas vencerían 14 días después de la fecha elegida.</p>
+      <form id="reminderPreview">
+        <label>Fecha de referencia <input name="previewDate" type="date" required></label>
+        <button>Consultar avisos</button>
+        <button id="sendReminderTest" type="button">Enviar al buzón de prueba</button>
+      </form>
+      <p id="reminderStatus" role="status"></p>
+      <ul id="reminderResults"></ul>
+    </details>
   </section>
 </main>
-<script src="panel.js?v=1ad4ffead02e" defer></script>
+<script src="panel.js?v=77aa5eebb3b9" defer></script>
 </html>
+
+
+
 
 
 

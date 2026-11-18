@@ -91,8 +91,18 @@ if (typeof document !== 'undefined') {
     const identifier = fields.get('identifier').replace(/[\s.-]/g, '').toUpperCase();
     const name = fields.get('fullName').trim();
     const phone = fields.get('phone').trim();
-    if (!name || !phone || !/^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Z]$/.test(identifier) || password !== fields.get('repeat')) {
-      signupStatus.textContent = 'Revisa el nombre, el teléfono, el DNI/NIE y que las contraseñas coincidan.';
+    if (!name || !phone) {
+      signupStatus.textContent = 'Introduce el nombre completo y el teléfono del titular.';
+      return;
+    }
+    if (!/^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Z]$/.test(identifier)) {
+      signupStatus.textContent = 'Introduce el DNI o NIE completo del titular de la cuenta, incluida la letra.';
+      signup.elements.identifier.focus();
+      return;
+    }
+    if (password !== fields.get('repeat')) {
+      signupStatus.textContent = 'Las contraseñas no coinciden.';
+      signup.elements.repeat.focus();
       return;
     }
     button.disabled = true;

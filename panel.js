@@ -319,7 +319,79 @@ get('login').addEventListener('submit', async event => {
   }
 });
 
+get('sendReminderTest').onclick = async event => {
+  const button = event.currentTarget;
+  const dateField = get('reminderPreview').elements.previewDate;
+  if (!dateField.reportValidity()) return;
+  const session = token;
+  const status = get('reminderStatus');
+  button.disabled = true;
+  status.textContent = 'Enviando al buzón de prueba…';
+  try {
+    const result = await request('/functions/v1/recordatorio-cuotas-prueba', { date: dateField.value });
+    if (token === session) status.textContent = result.message;
+  } catch {
+    if (token === session) status.textContent = 'No se confirmó el envío. Comprueba el buzón y los registros de la función antes de repetirlo.';
+  } finally {
+    button.disabled = false;
+  }
+};
 get('team').addEventListener('change', render);
+get('reminderPreview').onsubmit = async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button');
+  const status = get('reminderStatus');
+  const results = get('reminderResults');
+  const session = token;
+  button.disabled = true;
+  results.replaceChildren();
+  status.textContent = 'Consultando avisos…';
+  try {
+    const reminders = await rpc('bm_pinto_preview_registration_test_reminders', {
+      p_today: form.elements.previewDate.value,
+    });
+    if (token !== session) return;
+    const byRecipient = new Map();
+    for (const reminder of reminders) {
+      const recipient = reminder.recipient.trim().toLowerCase();
+      if (!byRecipient.has(recipient)) byRecipient.set(recipient, []);
+      byRecipient.get(recipient).push(reminder);
+    }
+    for (const [recipient, payments] of byRecipient) {
+      const entry = item('li', '');
+      const preview = document.createElement('details');
+      const totalCents = payments.reduce((sum, payment) => sum + Math.round(Number(payment.amount) * 100), 0);
+      preview.append(item('summary', recipient + ' · ' + money.format(totalCents / 100)));
+      preview.append(
+        item('strong', 'Recordatorio de cuotas · Club Balonmano Pinto'),
+        item('p', 'Hola, estas son las cuotas pendientes que vencen dentro de 14 días.'),
+      );
+      const list = document.createElement('ul');
+      for (const payment of payments) {
+        list.append(item('li', [
+          payment.reference, 'Cuota ' + payment.installment,
+          payment.due_on.split('-').reverse().join('/'), money.format(payment.amount),
+        ].join(' · ')));
+      }
+      const link = item('a', 'Mis inscripciones');
+      link.href = 'mis-inscripciones.html';
+      const nextStep = item('p', 'Puedes consultar el estado de las cuotas y adjuntar tus justificantes en ');
+      nextStep.append(link, '.');
+      preview.append(list, nextStep);
+      entry.append(preview);
+      results.append(entry);
+    }
+    status.textContent = reminders.length
+      ? new Intl.NumberFormat('es-ES').format(byRecipient.size) + (byRecipient.size === 1 ? ' correo previsto' : ' correos previstos') +
+        ' · ' + reminders.length + (reminders.length === 1 ? ' cuota' : ' cuotas')
+      : 'No hay avisos para esa fecha.';
+  } catch {
+    if (token === session) status.textContent = 'No se pudo consultar la vista previa.';
+  } finally {
+    button.disabled = false;
+  }
+};
 get('reference').addEventListener('input', render);
 get('refresh').addEventListener('click', async () => {
   try {
@@ -334,6 +406,8 @@ get('logout').addEventListener('click', () => {
   token = '';
   rows = [];
   get('registrations').replaceChildren();
+  get('reminderResults').replaceChildren();
+  get('reminderStatus').textContent = '';
   get('reference').value = '';
   get('team').value = '';
   get('status').textContent = '';
