@@ -69,8 +69,26 @@ if (location.origin === 'https://andresservant9.github.io') {
   .scheduled { border-top: 1px solid #e4e0da; padding-top: 1rem; margin-top: 1rem; }
   [hidden] { display: none !important; }
 </style>
+
+<style>
+header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.club-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; flex-basis: 100%; width: 100%; padding-top: .9rem; border-top: 1px solid #ffffff40; }
+.club-nav a { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: .55rem .4rem; border: 1px solid #ffffff45; border-radius: .5rem; color: #fff; font-size: .95rem; font-weight: 650; line-height: 1.3; text-align: center; text-decoration: none; }
+.club-nav a:hover { background: #ffffff20; }
+.club-nav a[aria-current="page"] { background: #fff; color: #242424; border-color: #fff; }
+.club-nav a:focus-visible { outline: 3px solid #f6e34e; outline-offset: 3px; }
+@media (max-width: 520px) { .club-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media print { .club-nav { display: none; } }
+</style>
 <main>
-  <header><img src="escudo.png" alt=""><div><p>Club Balonmano Pinto</p><h1>Inscripciones de prueba</h1></div></header>
+  <header class="club-header"><img src="escudo.png" alt=""><div><p>Club Balonmano Pinto</p><h1>Inscripciones de prueba</h1></div>
+<nav class="club-nav" aria-label="Navegación del club">
+  <a href="https://tienda-bm-pinto.pages.dev/">Tienda</a>
+  <a href="https://inscripcion-bm-pinto.pages.dev/">Inscripciones</a>
+  <a href="https://inscripcion-bm-pinto.pages.dev/panel" aria-current="page">Acceso club</a>
+  <a href="https://inscripcion-bm-pinto.pages.dev/socios">Socios</a>
+</nav>
+</header>
   <form id="login" class="surface inline-fields">
     <label>Correo <input type="email" name="email" autocomplete="username" required></label>
     <label>Contraseña <input type="password" name="password" autocomplete="current-password" required></label>
