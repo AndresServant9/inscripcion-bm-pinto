@@ -12,6 +12,21 @@ const discountStatus = document.querySelector('#discountPreviewStatus');
 const currency = new Intl.NumberFormat('es-ES', {style: 'currency', currency: 'EUR'});
 let discountRevision = 0;
 let draft;
+let verifiedQuote;
+
+function identifierValue(form) {
+  return form.elements.identifier.value.replace(/[\s.-]/g, '').toUpperCase();
+}
+
+function quoteIdentity() {
+  return {identifier: identifierValue(profile), email: profile.elements.email.value.trim().toLowerCase()};
+}
+
+function describeQuote(result) {
+  return 'Cuota de socio estimada: ' + currency.format(result.base_fee - result.membership_discount) + '.' +
+    (result.pending_installment_discount > 0
+      ? ' Ajuste previsto en la última cuota de la inscripción: ' + currency.format(result.pending_installment_discount) + '.' : '');
+}
 
 function clearStatus() {
   statusMessage.textContent = '';
@@ -24,6 +39,7 @@ function selectMode() {
   receiptStep.hidden = true;
   const renew = choices.find(choice => choice.checked).value === 'renew';
   discountRevision++;
+  verifiedQuote = null;
   discountPreview.hidden = renew;
   discountStatus.textContent = '';
   profile.hidden = renew;
@@ -33,10 +49,15 @@ function selectMode() {
 discountLogin.onsubmit = async event => {
   event.preventDefault();
   const revision = ++discountRevision;
+  verifiedQuote = null;
   const button = discountLogin.querySelector('button');
   button.disabled = true;
   discountStatus.textContent = 'Consultando descuento…';
   try {
+    const identity = quoteIdentity();
+    if (!/^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Z]$/.test(identity.identifier) || !identity.email) {
+      throw Error('Rellena primero el DNI o NIE y el correo del alta.');
+    }
     const base = new URL(api).origin;
     const headers = {apikey: key, 'Content-Type': 'application/json'};
     const email = discountLogin.elements.email.value.trim();
@@ -48,17 +69,15 @@ discountLogin.onsubmit = async event => {
     const account = await login.json();
     const quote = await fetch(base + '/rest/v1/rpc/bm_pinto_preview_membership_test_quote', {
       method: 'POST', headers: {...headers, Authorization: 'Bearer ' + account.access_token},
-      body: '{}', signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({p_identifier: identity.identifier, p_email: identity.email}),
+      signal: AbortSignal.timeout(15000),
     });
     if (!quote.ok) throw Error('No se pudo consultar el descuento.');
     const result = await quote.json();
-    if (!result) throw Error('Confirma el correo de la cuenta del club.');
+    if (!result) throw Error('El DNI o NIE y el correo del alta deben coincidir con los de tu cuenta verificada del club.');
     if (revision !== discountRevision) return;
-    discountStatus.textContent = 'Cuota de socio estimada: ' +
-      currency.format(result.base_fee - result.membership_discount) + '.' +
-      (result.pending_installment_discount > 0
-        ? ' Posible ajuste en el último plazo de la inscripción: ' + currency.format(result.pending_installment_discount) + '.' : '') +
-      ' Esta consulta es una simulación.';
+    verifiedQuote = result;
+    discountStatus.textContent = describeQuote(result) + ' El club confirma el descuento al revisar la solicitud.';
   } catch (error) {
     if (revision === discountRevision) discountStatus.textContent = error.message;
   } finally {
@@ -68,14 +87,22 @@ discountLogin.onsubmit = async event => {
 };
 
 for (const choice of choices) choice.addEventListener('change', selectMode);
+for (const field of [profile.elements.identifier, profile.elements.email]) {
+  field.addEventListener('input', () => {
+    discountRevision++;
+    verifiedQuote = null;
+    discountStatus.textContent = '';
+  });
+}
 for (const form of [profile, renewal]) {
   form.oninput = clearStatus;
   form.onsubmit = async event => {
     event.preventDefault();
     const button = form.querySelector('button');
     if (button.disabled) return;
+    if (form === profile && discountLogin.querySelector('button').disabled) return;
     const identifier = form.elements.identifier;
-    const normalized = identifier.value.replace(/[\s.-]/g, '').toUpperCase();
+    const normalized = identifierValue(form);
     statusMessage.hidden = false;
     if (!/^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Z]$/.test(normalized)) {
       statusMessage.textContent = 'Introduce un DNI o NIE completo, incluida la letra.';
@@ -111,7 +138,9 @@ for (const form of [profile, renewal]) {
     }
     draft = {p_id: crypto.randomUUID(), p_identifier: normalized, p_kind: kind, p_profile: data};
     requestSummary.textContent = kind === 'new'
-      ? data.fullName + ' · ' + data.email + ' · Cuota anual general de prueba: 35 €.'
+      ? data.fullName + ' · ' + data.email + ' · ' +
+        (verifiedQuote ? describeQuote(verifiedQuote) + ' El club confirma el descuento al revisar la solicitud.'
+          : 'Cuota anual general de prueba: 35 €.')
       : 'Renovación comprobada en el padrón de 2026/2027 · Cuota anual general de prueba: 35 €.';
     clearStatus();
     form.hidden = true;
