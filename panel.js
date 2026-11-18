@@ -822,7 +822,8 @@ get('reminderPreview').onsubmit = async event => {
 };
 get('reference').addEventListener('input', render);
 get('loadMembershipRequests').onclick = async () => {
-  const requestMembershipCard = id => request('/functions/v1/enviar-carne-socio-prueba', {id});
+  const requestMembershipCard = (id, campaign) => request('/functions/v1/' +
+    (campaign ? 'enviar-carne-socio-campana' : 'enviar-carne-socio-prueba'), {id});
   const session = token;
   if (!session) return;
   const status = get('membershipRequestStatus');
@@ -832,10 +833,13 @@ get('loadMembershipRequests').onclick = async () => {
   status.textContent = 'Consultando solicitudes…';
   try {
     const requests = await rpc('bm_pinto_review_membership_test', {p_id: null});
+    const routes = await rpc('bm_pinto_membership_card_routes', {});
     if (token !== session) return;
     list.replaceChildren();
     status.textContent = requests.length + (requests.length === 1 ? ' solicitud de prueba' : ' solicitudes de prueba');
     for (const request of requests) {
+      const campaign = routes[request.id]?.campaign === true;
+      if (campaign) request.card_state = routes[request.id].state;
       const entry = item('li', '');
       const title = request.kind === 'renew'
         ? ['Renovación', request.profile?.fullName].filter(Boolean).join(' · ')
@@ -853,13 +857,13 @@ get('loadMembershipRequests').onclick = async () => {
       }
       showMembershipDiscounts(request);
       const cardStatus = item('p', {
-        sent: 'Carné de prueba enviado.',
+        sent: campaign ? 'Carné enviado al correo del socio.' : 'Carné de prueba enviado.',
         sending: 'Envío en curso o pendiente de comprobar.',
         uncertain: 'Envío sin confirmar. Revisa el buzón de prueba.',
         failed: 'Falló la preparación del carné. Puedes reintentar.',
       }[request.card_state] ?? '');
       cardStatus.setAttribute('role', 'status');
-      const sendCard = item('button', 'Enviar carné de prueba');
+      const sendCard = item('button', campaign ? 'Enviar carné al socio' : 'Enviar carné de prueba');
       sendCard.type = 'button';
       sendCard.hidden = !request.approved_at || ['sent', 'sending', 'uncertain'].includes(request.card_state);
       async function sendApprovedCard() {
@@ -870,7 +874,7 @@ get('loadMembershipRequests').onclick = async () => {
         sendCard.disabled = true;
         cardStatus.textContent = 'Preparando el carné de prueba…';
         try {
-          const result = await requestMembershipCard(request.id);
+          const result = await requestMembershipCard(request.id, campaign);
           if (token !== session || !entry.isConnected) return;
           cardStatus.textContent = result.message;
           sendCard.hidden = true;
