@@ -321,6 +321,28 @@ get('login').addEventListener('submit', async event => {
   }
 });
 
+get('checkScheduledReminder').onclick = async event => {
+  const button = event.currentTarget;
+  const status = get('scheduledReminderStatus');
+  const session = token;
+  button.disabled = true;
+  status.textContent = 'Consultando el último envío…';
+  try {
+    const run = await rpc('bm_pinto_latest_registration_test_reminder');
+    if (token !== session) return;
+    const messages = {
+      accepted: 'El servidor de correo aceptó el aviso de prueba.',
+      failed: 'El intento de envío falló. Revisa los registros de la función.',
+      unavailable: 'Intento registrado. La respuesta todavía no está disponible o ya caducó.',
+    };
+    status.textContent = run ? run.date.split('-').reverse().join('/') + ' · ' + messages[run.status]
+      : 'El trabajo diario todavía no ha encolado ningún aviso.';
+  } catch {
+    if (token === session) status.textContent = 'No se pudo consultar el último envío.';
+  } finally {
+    button.disabled = false;
+  }
+};
 get('sendReminderTest').onclick = async event => {
   const button = event.currentTarget;
   const dateField = get('reminderPreview').elements.previewDate;
@@ -413,6 +435,7 @@ get('logout').addEventListener('click', () => {
   get('registrations').replaceChildren();
   get('reminderResults').replaceChildren();
   get('reminderStatus').textContent = '';
+  get('scheduledReminderStatus').textContent = '';
   get('reference').value = '';
   get('team').value = '';
   get('status').textContent = '';
