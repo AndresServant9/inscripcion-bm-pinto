@@ -2,6 +2,14 @@
 <html lang="es">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+if (location.origin === 'https://andresservant9.github.io') {
+  const destination = new URL(location.pathname.replace(/^\/inscripcion-bm-pinto(?=\/|$)/, '') || '/', 'https://inscripcion-bm-pinto.pages.dev');
+  destination.search = location.search;
+  destination.hash = location.hash;
+  location.replace(destination.href);
+}
+</script>
 <title>Socios 2027/2028 · Club Balonmano Pinto</title>
 <style>
   * { box-sizing: border-box; }
