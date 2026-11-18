@@ -27,7 +27,16 @@
 <section id="summary" hidden tabindex="-1"><h2>Resumen de la inscripción</h2><ul id="breakdown"></ul><output id="total"></output><p id="schedule"></p><p id="membership"></p><p id="reviewStatus" role="status"></p>
 <div class="review-actions">
 <button type="button" class="secondary" id="editRegistration">Volver a editar</button>
+<fieldset id="registrationAccount">
+<legend>Guardar en Mis inscripciones</legend>
+<label><input type="checkbox" id="linkRegistration"> Vincular a mi cuenta de la tienda</label>
+<div id="registrationCredentials" hidden>
+<label>Correo de la cuenta <input type="email" id="registrationEmail" autocomplete="username"></label>
+<label>Contraseña <input type="password" id="registrationPassword" autocomplete="current-password"></label>
+</div>
+</fieldset>
 <button type="button" id="confirmRegistration">Enviar inscripción de prueba</button>
+<a id="openMyRegistrations" href="mis-inscripciones.html" hidden>Ir a Mis inscripciones</a>
 <button type="button" id="printRegistration" hidden>Imprimir o guardar como PDF</button>
 </div>
 <small>El club recibe un resumen de prueba con categorías e importes. Usa datos ficticios.</small>
@@ -102,5 +111,6 @@
 <p><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es" target="_blank" rel="noopener noreferrer">Reglamento General de Protección de Datos</a> · <a href="https://boe.es/eli/es/lo/2018/12/05/3/con" target="_blank" rel="noopener noreferrer">Ley Orgánica 3/2018</a></p>
 <form method="dialog"><button autofocus>Cerrar</button></form>
 </dialog>
-<script src="inscripcion.js?v=5d786f3857e4"></script>
+<script src="inscripcion.js?v=d78a58e3595d"></script>
 </html>
+

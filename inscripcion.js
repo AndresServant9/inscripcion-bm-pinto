@@ -43,6 +43,16 @@ if (typeof document !== 'undefined') {
   const reviewStatus = document.querySelector('#reviewStatus');
   const confirmRegistration = document.querySelector('#confirmRegistration');
   const printRegistration = document.querySelector('#printRegistration');
+  const accountFields = document.querySelector('#registrationAccount');
+  const linkRegistration = document.querySelector('#linkRegistration');
+  const credentials = document.querySelector('#registrationCredentials');
+  const accountEmail = document.querySelector('#registrationEmail');
+  const accountPassword = document.querySelector('#registrationPassword');
+  const openMyRegistrations = document.querySelector('#openMyRegistrations');
+  linkRegistration.onchange = () => {
+    credentials.hidden = !linkRegistration.checked;
+    if (!linkRegistration.checked) accountPassword.value = '';
+  };
 
   document.querySelector('#editRegistration').onclick = () => {
     summary.hidden = true;
@@ -57,13 +67,33 @@ if (typeof document !== 'undefined') {
   confirmRegistration.onclick = async () => {
     if (!reviewedRegistration || registrationSending) return;
     const registration = reviewedRegistration;
+    const linked = linkRegistration.checked;
+    if (linked && (!accountEmail.value.trim() || !accountEmail.checkValidity() || !accountPassword.value)) {
+      reviewStatus.textContent = 'Introduce el correo y la contraseña de tu cuenta de la tienda.';
+      return;
+    }
     registrationSending = true;
     confirmRegistration.disabled = true;
+    accountFields.disabled = true;
     reviewStatus.textContent = 'Enviando inscripción de prueba…';
     try {
-      const response = await fetch(registrationApi, {
+      const headers = {apikey: publishableKey, 'Content-Type': 'application/json'};
+      let endpoint = registrationApi;
+      if (linked) {
+        const loginUrl = new URL('/auth/v1/token?grant_type=password', registrationApi);
+        const login = await fetch(loginUrl, {
+          method: 'POST', headers,
+          body: JSON.stringify({email: accountEmail.value.trim(), password: accountPassword.value}),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!login.ok) throw Error('No se pudo iniciar sesión. Comprueba el correo y la contraseña.');
+        const session = await login.json();
+        headers.Authorization = 'Bearer ' + session.access_token;
+        endpoint = registrationApi.replace('bm_pinto_submit_registration_test', 'bm_pinto_submit_owned_registration_test');
+      }
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {apikey: publishableKey, 'Content-Type': 'application/json'},
+        headers,
         body: JSON.stringify({submission_id: registration.id, submission: registration.data}),
         signal: AbortSignal.timeout(15000),
       });
@@ -71,7 +101,10 @@ if (typeof document !== 'undefined') {
       const reference = await response.json();
       if (typeof reference !== 'string' || !reference.startsWith('INS-PRUEBA-')) throw Error('No se pudo comprobar la recepción.');
       if (reviewedRegistration?.id !== registration.id) return;
-      reviewStatus.textContent = 'Prueba recibida por el club. Referencia ' + reference + '.';
+      reviewStatus.textContent = 'Prueba recibida por el club. Referencia ' + reference + '.' +
+        (linked ? ' Ya está disponible en Mis inscripciones.' : '');
+      accountFields.hidden = true;
+      openMyRegistrations.hidden = !linked;
       confirmRegistration.hidden = true;
       printRegistration.hidden = false;
       printRegistration.focus();
@@ -80,6 +113,8 @@ if (typeof document !== 'undefined') {
     } finally {
       registrationSending = false;
       confirmRegistration.disabled = false;
+      accountFields.disabled = false;
+      accountPassword.value = '';
     }
   };
   printRegistration.onclick = () => window.print();
@@ -297,6 +332,8 @@ if (typeof document !== 'undefined') {
     }
     reviewedRegistration = undecided ? null : {id: registrationKey, data: testData};
     confirmRegistration.hidden = undecided;
+    accountFields.hidden = undecided;
+    openMyRegistrations.hidden = true;
     printRegistration.hidden = true;
     summary.hidden = false;
     summary.focus();
