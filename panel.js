@@ -15,7 +15,9 @@ async function request(path, body) {
   if (!response.ok) {
     const error = new Error('Solicitud rechazada');
     error.status = response.status;
-    error.code = (await response.json().catch(() => ({}))).code;
+    const data = await response.json().catch(() => ({}));
+    error.code = data.code;
+    error.serverMessage = data.message;
     throw error;
   }
   return response.json();
@@ -330,8 +332,11 @@ get('sendReminderTest').onclick = async event => {
   try {
     const result = await request('/functions/v1/recordatorio-cuotas-prueba', { date: dateField.value });
     if (token === session) status.textContent = result.message;
-  } catch {
-    if (token === session) status.textContent = 'No se confirmó el envío. Comprueba el buzón y los registros de la función antes de repetirlo.';
+  } catch (error) {
+    if (token !== session) return;
+    status.textContent = location.protocol === 'file:'
+      ? 'Para enviar la prueba, abre el panel publicado en GitHub Pages.'
+      : error.serverMessage || 'No se confirmó el envío. Comprueba el buzón y los registros de la función antes de repetirlo.';
   } finally {
     button.disabled = false;
   }
@@ -365,7 +370,7 @@ get('reminderPreview').onsubmit = async event => {
       preview.append(item('summary', recipient + ' · ' + money.format(totalCents / 100)));
       preview.append(
         item('strong', 'Recordatorio de cuotas · Club Balonmano Pinto'),
-        item('p', 'Hola, estas son las cuotas pendientes que vencen dentro de 14 días.'),
+        item('p', 'Hola, estas son las cuotas pendientes que vencen dentro de 7 días.'),
       );
       const list = document.createElement('ul');
       for (const payment of payments) {
@@ -414,6 +419,7 @@ get('logout').addEventListener('click', () => {
   get('panel').hidden = true;
   get('login').hidden = false;
 });
+
 
 
 
