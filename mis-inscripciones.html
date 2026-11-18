@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mis inscripciones · Club Balonmano Pinto</title>
+<style>
+  body { margin: 0; background: #f4f2ee; color: #222; font: 1rem system-ui, sans-serif; }
+  main { max-width: 48rem; margin: auto; padding: 1rem; }
+  header, form, article { padding: 1.25rem; border-radius: .75rem; background: white; margin-bottom: 1rem; }
+  header { background: #222; color: white; }
+  h1 { margin: 0; }
+  label { display: block; margin-bottom: .75rem; }
+  input, button { font: inherit; padding: .5rem; }
+  button { background: #b50832; color: white; border: 0; border-radius: .35rem; }
+  h2 { overflow-wrap: anywhere; font-size: 1.1rem; }
+</style>
+<main>
+  <header>Club Balonmano Pinto<h1>Mis inscripciones</h1></header>
+  <form id="signin">
+    <label>Correo <input type="email" name="email" autocomplete="username" required></label>
+    <label>Contraseña <input type="password" name="password" autocomplete="current-password" required></label>
+    <button>Entrar</button>
+  </form>
+  <p id="message" role="status"></p>
+  <section id="family" hidden>
+    <button id="signout" type="button">Cerrar sesión</button>
+    <div id="enrollments"></div>
+  </section>
+</main>
+<script src="mis-inscripciones.js" defer></script>
+</html>
