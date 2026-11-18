@@ -23,6 +23,16 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 @media (max-width: 520px) { .club-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media print { .club-nav { display: none; } }
 </style>
+<style>
+#total { display: block; margin: 1rem 0; padding: 1rem; border: 2px solid #c89a00; border-radius: .6rem; background: #fff3bd; color: #242424; font-size: clamp(1.2rem, 4vw, 1.5rem); font-weight: 800; }
+.form-message:empty { display: none; }
+.form-message:not(:empty) { padding: .85rem 1rem; border-radius: .5rem; line-height: 1.5; }
+.form-message[data-kind="error"] { border: 2px solid #a60832; background: #fff0f3; color: #8a0629; font-weight: 700; }
+.form-message[data-kind="success"] { border: 1px solid #28733d; background: #edf8ef; color: #205c32; }
+.form-message[data-kind="info"] { border: 1px solid #d2d2d2; background: #f4f4f4; color: #242424; }
+#registrationAccount input[aria-invalid="true"] { border: 2px solid #a60832; background: #fff7f9; }
+@media print { .form-message { display: none; } }
+</style>
 <main>
 <header class="club-header"><img src="escudo.png" alt="Escudo del club"><div><p>Club Balonmano Pinto</p><h1>Inscripción 2027/2028</h1></div>
 <nav class="club-nav" aria-label="Navegación del club">
@@ -55,12 +65,12 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 </fieldset>
 <button type="submit">Revisar inscripción</button>
 </form>
-<section id="summary" hidden tabindex="-1"><h2>Resumen de la inscripción</h2><ul id="breakdown"></ul><output id="total"></output><p id="schedule"></p><p id="membership"></p><p id="reviewStatus" role="status"></p>
+<section id="summary" hidden tabindex="-1"><h2>Resumen de la inscripción</h2><output id="total"></output><ul id="breakdown"></ul><p id="schedule"></p><p id="membership"></p><p id="reviewStatus" class="form-message" role="status" tabindex="-1"></p>
 <fieldset id="registrationAccount">
 <legend>Cuenta del club (obligatoria)</legend>
 <div><h3>Ya tengo cuenta</h3><p>Introduce el correo y la contraseña de tu cuenta del club.</p>
-<label>Correo de la cuenta <input type="email" id="registrationEmail" autocomplete="username"></label>
-<label>Contraseña de la cuenta <input type="password" id="registrationPassword" autocomplete="current-password"></label>
+<label>Correo de la cuenta <input type="email" id="registrationEmail" autocomplete="username" aria-describedby="reviewStatus"></label>
+<label>Contraseña de la cuenta <input type="password" id="registrationPassword" autocomplete="current-password" aria-describedby="reviewStatus"></label>
 
 </div>
 <details id="createRegistrationAccount">
@@ -79,7 +89,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <label>Código del correo<input name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
 <button>Verificar correo</button>
 </form>
-<p id="registrationSignupStatus" role="status"></p>
+<p id="registrationSignupStatus" class="form-message" role="status" tabindex="-1"></p>
 </details>
 <label id="firstReceiptField" hidden><span id="firstReceiptLabel"></span>
 <input type="file" id="firstReceipt" accept=".pdf,.jpg,.jpeg,.png"></label>
@@ -163,7 +173,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <p><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es" target="_blank" rel="noopener noreferrer">Reglamento General de Protección de Datos</a> · <a href="https://boe.es/eli/es/lo/2018/12/05/3/con" target="_blank" rel="noopener noreferrer">Ley Orgánica 3/2018</a></p>
 <form method="dialog"><button autofocus>Cerrar</button></form>
 </dialog>
-<script src="inscripcion.js?v=3df06bd1e072"></script>
+<script src="inscripcion.js?v=resumen-pagos-errores-80"></script>
 </html>
 
 
