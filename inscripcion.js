@@ -322,6 +322,7 @@ if (typeof document !== 'undefined') {
     accountFields.disabled = true;
     setStatus(reviewStatus, 'Enviando inscripción…', 'info');
     try {
+      const encodedReceipt = needsReceipt ? await window.ClubReceipts.read(file) : null;
       const headers = {apikey: publishableKey, 'Content-Type': 'application/json'};
       let endpoint = registrationApi;
       const payload = {submission_id: registration.id, submission: registration.data, p_details: registration.details};
@@ -335,12 +336,7 @@ if (typeof document !== 'undefined') {
         if (login && !login.ok) throw Error('No se pudo iniciar sesión. Comprueba el correo y la contraseña.');
         headers.Authorization = 'Bearer ' + (existingSession ? existingSession.token : (await login.json()).access_token);
         endpoint = registrationApi.replace('bm_pinto_submit_registration_test', 'bm_pinto_submit_registration_test_details');
-        payload.first_receipt = needsReceipt ? await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result).split(',')[1]);
-          reader.onerror = () => reject(Error('No se pudo leer el justificante.'));
-          reader.readAsDataURL(file);
-        }) : null;
+        payload.first_receipt = encodedReceipt;
       }
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -349,7 +345,10 @@ if (typeof document !== 'undefined') {
         signal: AbortSignal.timeout(15000),
       });
       if (!response.ok) {
-        if (response.status === 401) clubSession = null;
+        if (response.status === 401) {
+          clubSession = null;
+          throw Error('La sesión ha caducado. Introduce de nuevo el correo y la contraseña para enviar la inscripción; los datos del formulario se conservan.');
+        }
         const failure = await response.json().catch(() => ({}));
         if (failure.code === 'PGRST202') throw Error('El envío de inscripciones no está disponible. Contacta con el club.');
         if (failure.message === 'Ficha de prueba incorrecta') throw Error('Revisa los datos de contacto, el domicilio y las autorizaciones.');
@@ -374,7 +373,10 @@ if (typeof document !== 'undefined') {
       printRegistration.hidden = false;
       printRegistration.focus();
     } catch (error) {
-      if (reviewedRegistration?.id === registration.id) setStatus(reviewStatus, error.message);
+      if (reviewedRegistration?.id === registration.id) setStatus(reviewStatus,
+        error instanceof TypeError || error.name === 'TimeoutError'
+          ? 'No se pudo confirmar la recepción. Consulta Mis inscripciones antes de editar los datos; si no aparece, reintenta el mismo envío.'
+          : error.message);
     } finally {
       registrationSending = false;
       confirmRegistration.disabled = false;

@@ -134,12 +134,7 @@ receiptStep.onsubmit = async event => {
   controls.forEach(control => { control.disabled = true; });
   statusMessage.textContent = 'Enviando solicitud…';
   try {
-    const encoded = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result).split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    const encoded = await window.ClubReceipts.read(file);
     const response = await fetch(api, {
       method: 'POST',
       headers: {apikey: key, 'Content-Type': 'application/json'},

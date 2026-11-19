@@ -153,25 +153,21 @@ function receiptForm(id, payment) {
   upload.onsubmit = async event => {
     event.preventDefault();
     const file = input.files[0];
-    if (!file?.size || file.size > 5 * 1024 * 1024) {
-      feedback.textContent = 'Selecciona un archivo de hasta 5 MB.';
+    if (!file) {
+      feedback.textContent = 'Selecciona un justificante PDF, JPG o PNG.';
       return;
     }
     const session = token;
     button.disabled = input.disabled = true;
     feedback.textContent = 'Subiendo justificante…';
     try {
-      const encoded = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      const encoded = await window.ClubReceipts.read(file);
       await post('/rest/v1/rpc/bm_pinto_upload_registration_test_receipt', {
         p_id: id, p_schedule: payment.schedule, p_installment: payment.installment, p_file: encoded,
       }, session);
-    } catch {
-      feedback.textContent = 'No se pudo subir el justificante. Comprueba el formato y que la cuota siga pendiente.';
+    } catch (error) {
+      feedback.textContent = error.name === 'ReceiptError' ? error.message
+        : 'No se pudo confirmar la subida. Pulsa Actualizar estado antes de volver a subirlo, para comprobar si el justificante ya se ha recibido.';
       button.disabled = input.disabled = false;
       return;
     }
