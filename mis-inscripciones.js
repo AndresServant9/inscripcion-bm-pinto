@@ -31,7 +31,6 @@ function membershipRequest(row) {
       (row.is_campaign ? 'Carné enviado al correo de la solicitud.' : 'Carné de prueba enviado al buzón de pruebas.') :
       'El club está gestionando el envío del carné.'));
   }
-  card.append(node('p', 'Referencia SOCIO-PRUEBA-' + row.id));
   return card;
 }
 
@@ -60,25 +59,9 @@ function node(tag, content) {
 function enrollment(row, rejections) {
   const card = node('article', '');
   const account = row.payments;
-  const reference = 'INS-PRUEBA-' + row.id;
-  const copy = node('button', 'Copiar referencia');
-  const feedback = node('p', '');
-  feedback.hidden = true;
-  feedback.setAttribute('role', 'status');
-  copy.type = 'button';
-  copy.onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(reference);
-      feedback.textContent = 'Referencia copiada.';
-    } catch {
-      feedback.textContent = 'Selecciona la referencia que aparece arriba y cópiala manualmente.';
-    }
-    feedback.hidden = false;
-  };
-  const names = account.player_names ?? [];
-  card.append(node('h2', names.length ? names.join(' · ') : reference));
-  if (names.length) card.append(node('p', 'Referencia ' + reference));
-  card.append(copy, feedback, node('p', row.categories.join(' · ')));
+  const names = (account.player_names ?? []).filter(name => typeof name === 'string' && name.trim() && !name.includes('@'));
+  card.append(node('h2', names.length ? names.join(' · ') : 'Inscripción · ' + row.categories.join(' · ')));
+  if (names.length) card.append(node('p', row.categories.join(' · ')));
   if (account.agreement_pending) {
     card.append(node('p', 'Acuerdo pendiente de concretar'));
     return card;
@@ -97,8 +80,11 @@ function enrollment(row, rejections) {
     'En revisión ' + euro.format(account.in_review), 'Pendiente ' + euro.format(account.pending),
   ].join(' · ')));
   const list = node('ul', '');
+  let paymentNumber = 0;
   for (const payment of account.installments) {
-    const label = payment.due_on ? 'Vencimiento ' + payment.due_on.split('-').reverse().join('/') : 'Ingreso sin vencimiento';
+    if (payment.status === 'not_applicable' && Number(payment.amount) === 0) continue;
+    paymentNumber += 1;
+    const label = payment.due_on ? 'Pago ' + paymentNumber + ' · Vencimiento ' + payment.due_on.split('-').reverse().join('/') : 'Ingreso sin vencimiento';
     const history = payment.confirmed_at ? 'Confirmado el ' + historyDate.format(new Date(payment.confirmed_at))
       : payment.receipt_received_at ? 'Justificante recibido el ' + historyDate.format(new Date(payment.receipt_received_at))
       : '';
@@ -297,3 +283,4 @@ get('signout').onclick = () => {
   get('family').hidden = true;
   form.hidden = false;
 };
+
