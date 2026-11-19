@@ -72,6 +72,7 @@ for (const form of [profile, renewal]) {
         }
         reservation = await response.json();
         if (!reservation?.id) throw Error('No se pudo confirmar la reserva. Vuelve a intentarlo.');
+        reviewRequestId = reservation.id;
       } catch (error) {
         statusMessage.textContent = error.message;
         return;
@@ -179,3 +180,4 @@ receiptStep.onsubmit = async event => {
   }
 };
 selectMode();
+
