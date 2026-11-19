@@ -283,4 +283,3 @@ get('signout').onclick = () => {
   get('family').hidden = true;
   form.hidden = false;
 };
-

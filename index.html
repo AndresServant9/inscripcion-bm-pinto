@@ -67,6 +67,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <label id="splitPaymentOption"><input type="radio" name="payment" value="split"> Pago fraccionado</label>
 <small id="proratedPaymentNote" hidden>Desde diciembre se paga al inscribirse. El importe se ajusta al mes de incorporación.</small>
 </fieldset>
+<label><input type="checkbox" name="privacyRead" required> He leído el <a href="privacidad.html" target="_blank" rel="noopener noreferrer">aviso de privacidad</a> y confirmo que inscribo al propio jugador o actúo como Padre/Madre/Tutor con facultad para autorizar su participación.</label>
 <button type="submit">Revisar inscripción</button>
 </form>
 <section id="summary" hidden tabindex="-1"><h2>Resumen de la inscripción</h2><output id="total"></output><ul id="breakdown"></ul><p id="schedule"></p><p id="membership"></p><p id="reviewStatus" class="form-message" role="status" tabindex="-1"></p>
@@ -75,6 +76,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <div><h3>Ya tengo cuenta</h3><p>Introduce el correo y la contraseña de tu cuenta del club.</p>
 <label>Correo de la cuenta <input type="email" id="registrationEmail" autocomplete="username" aria-describedby="reviewStatus"></label>
 <label>Contraseña de la cuenta <input type="password" id="registrationPassword" autocomplete="current-password" aria-describedby="reviewStatus"></label>
+<p><a href="recuperar-cuenta.html" target="_blank" rel="noopener noreferrer">He olvidado mi contraseña</a></p>
 
 </div>
 <details id="createRegistrationAccount">
@@ -92,6 +94,8 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <form id="registrationVerify" hidden>
 <label>Código del correo<input name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
 <button>Verificar correo</button>
+<button type="button" class="secondary" id="resendRegistrationCode">Reenviar código</button>
+<button type="button" class="secondary" id="changeRegistrationEmail">Cambiar correo</button>
 </form>
 <p id="registrationSignupStatus" class="form-message" role="status" tabindex="-1"></p>
 </details>
@@ -138,9 +142,11 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <label><span class="trouser-label">Talla de pantalón</span><select name="shorts" required></select></label>
 </div>
 <label><input name="fitted" type="checkbox"> El club ya tomó las tallas presencialmente</label></div>
-<label>¿Hay información de salud relevante para la actividad?
+<label>¿Quieres comunicar información de salud necesaria para la actividad?
 <select name="hasHealth" required><option value="">Selecciona</option><option value="yes">Sí</option><option value="no">No</option></select></label>
-<label class="health-detail" hidden>Información que debe conocer el club<textarea name="health" maxlength="500" rows="2" disabled></textarea></label>
+<div class="health-detail" hidden><label>Información que debe conocer el club<textarea name="health" maxlength="500" rows="2" disabled></textarea></label>
+<label><input type="checkbox" name="healthConsent" disabled> Consiento expresamente que el club trate esta información de salud para adaptar la actividad y gestionar una incidencia. Puedo retirar este consentimiento escribiendo al club.</label>
+<small>Comunica solo lo necesario. Si prefieres no indicarlo aquí, elige No y contacta con el club para valorar las necesidades de la actividad. <a href="privacidad.html#salud" target="_blank" rel="noopener noreferrer">Cómo se tratan los datos de salud</a>.</small></div>
 
 <div class="grid">
 <div class="authorization"><a href="#authorizationDetails" data-authorization="outings" aria-haspopup="dialog">Actividades fuera del pabellón</a><select aria-label="Actividades fuera del pabellón" name="outings" required><option value="">Selecciona</option><option>Sí</option><option>No</option></select></div>
@@ -154,7 +160,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <h2 id="authorizationTitle"></h2>
 <div id="authorizationText"></div>
 <template id="federatedProtocol">
-<p><small>Referencia para preparar la temporada 2027/2028. El club confirmará la póliza, los centros y los contactos antes de abrir la inscripción.</small></p>
+<p><small>Protocolo de referencia para federados de Alevín a Sénior, temporada 2027/2028. Consulta siempre los centros concertados vigentes con la aseguradora.</small></p>
 <p><strong>Urgencia vital.</strong> Llama al <a href="tel:112">112</a> o acude al centro más cercano. Avisa al entrenador cuando sea posible.</p>
 <p><strong>Urgencia deportiva.</strong> Avisa al entrenador y llama a Nueva Mutua Sanitaria al <a href="tel:900909766">900 90 97 66</a> (24 h) para que te indique el centro concertado y gestione la autorización si hace falta. El protocolo prevé la atención urgente dentro de las primeras 48 horas. El club recomienda consultar por Montepríncipe, especialmente los fines de semana. Confirma el centro con la aseguradora.</p>
 <p><strong>Si no es urgente.</strong> Pide el parte al club y solicita autorización para una cita en un centro concertado. Llama al <a href="tel:+34912908075">91 290 80 75</a> (lunes a viernes, de 8:00 a 20:00) o escribe a <a href="mailto:accidentesdeportivos@nuevamutuasanitaria.es">accidentesdeportivos@nuevamutuasanitaria.es</a>.</p>
@@ -171,14 +177,14 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <p><strong>Responsable</strong> · Club Balonmano Pinto, NIF G80491095, Calle Asturias, s/n, 28320 Pinto. <a href="mailto:balonmanopinto1@gmail.com">balonmanopinto1@gmail.com</a>.</p>
 <p>Este formulario recoge los datos de contacto, identificación, equipación, salud y autorizaciones necesarios para tramitar la inscripción. La cuenta del club utiliza la verificación de correo electrónico.</p>
 <p>El club utilizará los datos necesarios para gestionar el alta y la actividad deportiva. La publicación de imágenes dependerá de tu elección. Puedes retirar ese permiso escribiendo al correo del club. Elegir «No» permite continuar con la inscripción.</p>
-<p>Antes de abrir la inscripción, el club completará este aviso con las bases jurídicas, los destinatarios, los criterios de conservación y el tratamiento específico de los datos de salud.</p>
+<p>La gestión de la inscripción se basa en la relación con el club y en las obligaciones legales aplicables. La comunicación de datos de salud y la publicación de imágenes requieren tu consentimiento específico. Los datos se comunican a la federación, aseguradora o proveedor de ropa únicamente cuando la gestión lo requiere.</p>
+<p>Consulta las finalidades, bases jurídicas, conservación, proveedores y derechos en el <a href="privacidad.html" target="_blank" rel="noopener noreferrer">aviso de privacidad completo</a>.</p>
 <p>Puedes dirigirte al club para ejercer tus derechos de protección de datos y presentar una reclamación ante la <a href="https://www.aepd.es/" target="_blank" rel="noopener noreferrer">Agencia Española de Protección de Datos</a>.</p>
 <p><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es" target="_blank" rel="noopener noreferrer">Reglamento General de Protección de Datos</a> · <a href="https://boe.es/eli/es/lo/2018/12/05/3/con" target="_blank" rel="noopener noreferrer">Ley Orgánica 3/2018</a></p>
 <form method="dialog"><button autofocus>Cerrar</button></form>
 </dialog>
-<script src="inscripcion.js?v=interfaz-publica-89"></script>
+<script src="inscripcion.js?v=acceso-privacidad-96"></script>
 </html>
-
 
 
 

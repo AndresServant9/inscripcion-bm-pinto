@@ -647,17 +647,14 @@ get('checkScheduledReminder').onclick = async event => {
   button.disabled = true;
   status.textContent = 'Consultando el último envío…';
   try {
-    const run = await rpc('bm_pinto_latest_registration_test_reminder');
+    const run = await rpc('bm_pinto_latest_registration_reminders');
     if (token !== session) return;
-    const messages = {
-      accepted: 'El servidor de correo aceptó el aviso de comprobación.',
-      failed: 'El intento de envío falló. Revisa los registros de la función.',
-      unavailable: 'Intento registrado. La respuesta todavía no está disponible o ya caducó.',
-    };
-    status.textContent = run ? run.date.split('-').reverse().join('/') + ' · ' + messages[run.status]
-      : 'El trabajo diario todavía no ha encolado ningún aviso.';
+    status.textContent = run ? [run.date.split('-').reverse().join('/'),
+      'Enviados: ' + run.sent, 'En cola: ' + run.queued, 'En curso: ' + run.sending,
+      'Fallidos: ' + run.failed, 'Sin confirmar: ' + run.uncertain, 'Cancelados: ' + run.cancelled].join(' · ')
+      : 'El sistema de recordatorios reales todavía no ha registrado ninguna ejecución.';
   } catch {
-    if (token === session) status.textContent = 'No se pudo consultar el último envío.';
+    if (token === session) status.textContent = 'No se pudo consultar el estado de los avisos. Comprueba que se ha instalado el SQL 93.';
   } finally {
     button.disabled = false;
   }
@@ -812,7 +809,7 @@ get('reminderPreview').onsubmit = async event => {
   results.replaceChildren();
   status.textContent = 'Consultando avisos…';
   try {
-    const reminders = await rpc('bm_pinto_preview_registration_test_reminders', {
+    const reminders = await rpc('bm_pinto_preview_registration_reminders', {
       p_today: form.elements.previewDate.value,
     });
     if (token !== session) return;
@@ -834,7 +831,7 @@ get('reminderPreview').onsubmit = async event => {
       const list = document.createElement('ul');
       for (const payment of payments) {
         list.append(item('li', [
-          payment.reference.replace(/^INS-PRUEBA-/, 'INS-'), 'Cuota ' + payment.installment,
+          (payment.player_names ?? ['Inscripción del club']).join(' · '), payment.payment_label,
           payment.due_on.split('-').reverse().join('/'), money.format(payment.amount),
         ].join(' · ')));
       }
@@ -1162,7 +1159,6 @@ get('logout').addEventListener('click', () => {
   get('panel').hidden = true;
   get('login').hidden = false;
 });
-
 
 
 

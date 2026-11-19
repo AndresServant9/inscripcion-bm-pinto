@@ -104,7 +104,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
   <form id="login" class="surface inline-fields">
     <label>Correo <input type="email" name="email" autocomplete="username" required></label>
     <label>Contraseña <input type="password" name="password" autocomplete="current-password" required></label>
-    <button>Entrar</button>
+    <button>Entrar</button><p><a href="recuperar-cuenta.html">He olvidado mi contraseña</a></p>
   </form>
   <p id="status" role="status"></p>
   <section id="panel" hidden>
@@ -223,14 +223,15 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
     <details id="reminders" class="surface" open>
       <summary>Vista previa de recordatorios de cuotas</summary>
       <p>Consulta qué cuotas vencerían 7 días después de la fecha elegida.</p>
-      <p><strong>El envío automático a las familias está pendiente de activar.</strong> Esta sección permite consultar los avisos previstos.</p>
+      <p>Los recordatorios se envían 7 días antes del vencimiento, solo para cuotas pendientes. Cada familia recibe un correo con sus cuotas. Los pagos en revisión o confirmados y el pago a demanda quedan excluidos.</p>
+      <p>Esta vista previa no envía correos. El envío automático requiere instalar el SQL 93, desplegar la función de correo y activar la programación con el SQL 94.</p>
       <form id="reminderPreview" class="inline-fields">
         <label>Fecha de referencia <input name="previewDate" type="date" required></label>
         <button>Consultar avisos</button>
       </form>
       <p id="reminderStatus" role="status"></p>
       <ul id="reminderResults"></ul>
-      <div class="scheduled"><button id="checkScheduledReminder" class="secondary" type="button">Consultar último envío automático</button>
+      <div class="scheduled"><button id="checkScheduledReminder" class="secondary" type="button">Consultar estado de los avisos</button>
       <p id="scheduledReminderStatus" role="status"></p>
       </div>
     </details>
@@ -238,9 +239,8 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
   </section>
 </main>
 <script src="exportar-packs.js?v=c53ae8de7940" defer></script>
-<script src="panel.js?v=interfaz-publica-89" defer></script>
+<script src="panel.js?v=recordatorios-reales-93" defer></script>
 </html>
-
 
 
 

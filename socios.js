@@ -4,7 +4,7 @@ const statusMessage = document.querySelector('#status');
 const choices = [...document.querySelectorAll('input[name="kind"]')];
 const receiptStep = document.querySelector('#receiptStep');
 const requestSummary = document.querySelector('#requestSummary');
-const api = 'https://dfwnzfznhnkcqrdcydnx.supabase.co/rest/v1/rpc/bm_pinto_submit_membership_test';
+const api = 'https://dfwnzfznhnkcqrdcydnx.supabase.co/rest/v1/rpc/bm_pinto_submit_membership_request';
 const key = 'sb_publishable_U3568BhgdgCt7ysDU5l1CA_1CenKkjU';
 const currency = new Intl.NumberFormat('es-ES', {style: 'currency', currency: 'EUR'});
 let draft;
@@ -143,7 +143,7 @@ receiptStep.onsubmit = async event => {
     const response = await fetch(api, {
       method: 'POST',
       headers: {apikey: key, 'Content-Type': 'application/json'},
-      body: JSON.stringify({...draft.submission, p_receipt: encoded}),
+      body: JSON.stringify({...draft.submission, p_receipt: encoded, p_privacy: {version:'2027-2028-v2', acknowledged:receiptStep.elements.privacyRead.checked}}),
       signal: AbortSignal.timeout(20000),
     });
     if (!response.ok) {
@@ -180,4 +180,3 @@ receiptStep.onsubmit = async event => {
   }
 };
 selectMode();
-

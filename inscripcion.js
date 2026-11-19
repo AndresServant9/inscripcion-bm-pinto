@@ -225,6 +225,7 @@ if (typeof document !== 'undefined') {
       }
       if (!ok) throw Error('No se pudo crear la cuenta. Comprueba los datos o inténtalo más tarde.');
       pendingAccount = {email, identifier};
+      lastCodeSent = Date.now();
       signup.reset();
       signup.hidden = true;
       verify.hidden = false;
@@ -264,6 +265,36 @@ if (typeof document !== 'undefined') {
     } finally {
       button.disabled = false;
     }
+  };
+  let lastCodeSent = 0;
+  document.querySelector('#resendRegistrationCode').onclick = async event => {
+    if (!pendingAccount || pendingAccount.token) return;
+    const button = event.currentTarget;
+    if (button.disabled) return;
+    if (Date.now() - lastCodeSent < 60000) {
+      setStatus(signupStatus, 'Espera un minuto antes de solicitar otro código.', 'info');
+      return;
+    }
+    button.disabled = true;
+    try {
+      const result = await accountRequest('/auth/v1/resend', {type:'signup', email:pendingAccount.email});
+      if (!result.ok) throw Error('No se pudo reenviar el código. Espera un minuto y vuelve a intentarlo.');
+      lastCodeSent = Date.now();
+      setStatus(signupStatus, 'Código solicitado. Revisa el correo no deseado y usa el último código recibido.', 'info');
+    } catch (error) { setStatus(signupStatus, error.message); }
+    finally { button.disabled = false; }
+  };
+  document.querySelector('#changeRegistrationEmail').onclick = () => {
+    if (verify.querySelector('button').disabled) return;
+    const email = pendingAccount?.email || '';
+    pendingAccount = null;
+    verify.reset();
+    verify.hidden = true;
+    signup.hidden = false;
+    prefillAccount();
+    signup.elements.email.value = email;
+    setStatus(signupStatus, 'Corrige el correo y solicita la verificación. Si la cuenta ya existe, inicia sesión o recupera la contraseña.', 'info');
+    signup.elements.email.focus();
   };
   let reviewedRegistration = null;
   let reviewedPayload = '';
@@ -359,11 +390,11 @@ if (typeof document !== 'undefined') {
     button.addEventListener('click', () => privacyDetails.showModal());
   }
   const authorizationTexts = {
-    nonFederatedProtocol: 'Temporada 2027/2028. Este apartado corresponde a Prebenjamín y Benjamín. Ante un accidente durante la actividad, avisa al entrenador. El club facilitará el procedimiento aplicable cuando esté confirmado.',
+    nonFederatedProtocol: 'Prebenjamín y Benjamín: según el procedimiento del club, la atención se realiza a través de la sanidad pública (Seguridad Social). Avisa al entrenador y al Padre/Madre/Tutor y acude al centro de salud o a las urgencias públicas según la necesidad. En una urgencia vital, llama al 112. No se aplica el circuito de Nueva Mutua Sanitaria ni sus centros privados concertados a estas categorías.',
 
     outings: 'Al elegir Sí, autorizas al jugador o jugadora a participar en actividades de balonmano fuera del pabellón Sandra Aguilar y a acudir a otras instalaciones deportivas bajo la supervisión del entrenador o de la persona designada por el club.',
     transport: 'Al elegir Sí, autorizas los desplazamientos a partidos o entrenamientos en coche particular de un compañero o entrenador previo acuerdo entre las partes. También autorizas los desplazamientos a torneos del club en transporte contratado o en vehículos particulares de familias o entrenadores, con información previa del viaje.',
-    images: 'Al elegir Sí, autorizas al Club Balonmano Pinto a publicar fotografías del jugador o jugadora tomadas durante las actividades del club en su web, boletines y memorias o publicaciones relacionadas con esas actividades.',
+    images: 'Al elegir Sí, autorizas al Club Balonmano Pinto a utilizar fotografías del jugador o jugadora tomadas durante las actividades del club en la web del club, memorias y publicaciones informativas de esas actividades. No incluye campañas publicitarias ajenas al club. Elegir No no impide inscribirse ni participar. Puedes retirar el consentimiento escribiendo a balonmanopinto1@gmail.com; la retirada no afecta a usos anteriores lícitos. Si se trata de un menor, debe actuar su representante con facultades para autorizar, respetando el interés y la voluntad del menor. Consulta el aviso de privacidad para conocer tus derechos.',
   };
   form.addEventListener('click', event => {
     const link = event.target.closest('[data-authorization]');
@@ -451,6 +482,10 @@ if (typeof document !== 'undefined') {
     const health = field(player, 'health');
     health.disabled = !reportHealth;
     health.required = reportHealth;
+    const healthConsent = field(player, 'healthConsent');
+    healthConsent.disabled = !reportHealth;
+    healthConsent.required = reportHealth;
+    if (!reportHealth) healthConsent.checked = false;
     if (!reportHealth) health.value = '';
     player.querySelector('.health-detail').hidden = !reportHealth;
     const seniorMale = category?.name === 'Sénior' && field(player, 'division').value === 'male';
@@ -627,6 +662,7 @@ if (typeof document !== 'undefined') {
       })),
     };
     const details = {
+      privacy: {version: '2027-2028-v2', acknowledged: form.elements.privacyRead.checked},
       contact: {
         name: form.elements.contact.value.trim(),
         email: form.elements.email.value.trim(),
@@ -640,6 +676,7 @@ if (typeof document !== 'undefined') {
         town: players[index].town,
         registeredInPinto: players[index].registeredInPinto,
         health: field(player, 'health').disabled ? '' : field(player, 'health').value.trim(),
+        healthConsent: !field(player, 'healthConsent').disabled && field(player, 'healthConsent').checked,
         authorizations: Object.fromEntries(['outings', 'transport', 'images'].map(name => [name, field(player, name).value])),
       })),
     };
@@ -659,7 +696,6 @@ if (typeof document !== 'undefined') {
     summary.focus();
   };
 }
-
 
 
 
