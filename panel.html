@@ -10,7 +10,7 @@ if (location.origin === 'https://andresservant9.github.io') {
   location.replace(destination.href);
 }
 </script>
-<title>Inscripciones de prueba · Club Balonmano Pinto</title>
+<title>Gestión del club · Club Balonmano Pinto</title>
 <style>
   * { box-sizing: border-box; }
   body { font: 1rem/1.5 system-ui, sans-serif; background: #f4f2ee; color: #242424; margin: 0; }
@@ -93,7 +93,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 @media print { .club-nav { display: none; } }
 </style>
 <main>
-  <header class="club-header"><img src="escudo.png" alt=""><div><p>Club Balonmano Pinto</p><h1>Inscripciones de prueba</h1></div>
+  <header class="club-header"><img src="escudo.png" alt=""><div><p>Club Balonmano Pinto</p><h1>Gestión del club</h1></div>
 <nav class="club-nav" aria-label="Navegación del club">
   <a href="https://tienda-bm-pinto.pages.dev/">Tienda</a>
   <a href="https://inscripcion-bm-pinto.pages.dev/">Inscripciones</a>
@@ -223,10 +223,10 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
     <details id="reminders" class="surface" open>
       <summary>Vista previa de recordatorios de cuotas</summary>
       <p>Consulta qué cuotas vencerían 7 días después de la fecha elegida.</p>
+      <p><strong>El envío automático a las familias está pendiente de activar.</strong> Esta sección permite consultar los avisos previstos.</p>
       <form id="reminderPreview" class="inline-fields">
         <label>Fecha de referencia <input name="previewDate" type="date" required></label>
         <button>Consultar avisos</button>
-        <button id="sendReminderTest" class="secondary" type="button">Enviar al buzón de prueba</button>
       </form>
       <p id="reminderStatus" role="status"></p>
       <ul id="reminderResults"></ul>
@@ -238,7 +238,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
   </section>
 </main>
 <script src="exportar-packs.js?v=c53ae8de7940" defer></script>
-<script src="panel.js?v=gestion-socios-85" defer></script>
+<script src="panel.js?v=interfaz-publica-89" defer></script>
 </html>
 
 
