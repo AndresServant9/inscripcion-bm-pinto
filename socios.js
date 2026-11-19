@@ -170,7 +170,7 @@ receiptStep.onsubmit = async event => {
     renewal.reset();
     selectMode();
     statusMessage.hidden = false;
-    statusMessage.textContent = 'Solicitud recibida. Pendiente de revisión por el club. Referencia ' + reference + '.';
+    statusMessage.textContent = 'Solicitud recibida. El club revisará el justificante y te enviará el carné cuando la valide.';
   } catch (error) {
     statusMessage.textContent = error instanceof TypeError || error.name === 'TimeoutError'
       ? 'No se pudo confirmar el envío. Revisa la conexión y vuelve a intentar el mismo envío.'
