@@ -60,7 +60,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <label>Correo electrónico<input type="email" name="email" required></label>
 <label>Teléfono<input type="tel" name="phone" required></label></div>
 <p class="authorization"><a href="https://chat.whatsapp.com/HCeexWXYCFO7ayt5HTg3wP?s=sw&amp;p=a&amp;iam=2" target="_blank" rel="noopener noreferrer">Entrar al canal de información general del club en WhatsApp</a></p>
-<label><input name="member" type="checkbox"> <span id="memberLabel">El jugador o su Padre/Madre/Tutor ya es socio del club</span></label>
+<label id="guardianMemberField" hidden><input name="member" type="checkbox" disabled> El Padre/Madre/Tutor ya es socio del club (descuento para los menores inscritos)</label>
 </fieldset>
 <fieldset><legend>Forma de pago</legend>
 <label><input type="radio" name="payment" value="single" checked> Pago único</label>
@@ -125,6 +125,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <output class="category" aria-live="polite"></output>
 <label>Documento del jugador (DNI/NIE)<input name="playerId" maxlength="12" required></label>
 <label class="no-player-id" hidden><input type="checkbox" name="noPlayerId" disabled> El menor no tiene DNI/NIE</label>
+<label class="own-membership" hidden><input type="checkbox" name="ownMember" disabled> Este jugador ya es socio del club</label>
 <p class="player-id-warning" role="status" hidden>Desde los 14 años, la Federación exige al jugador un documento propio para tramitar la ficha. Puedes continuar con la inscripción.</p>
 
 <div class="protocol authorization" hidden><a href="#authorizationDetails" aria-haspopup="dialog"></a></div>
@@ -186,7 +187,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 </dialog>
 <script src="transferencias.js?v=104" defer></script>
 <script src="justificantes.js?v=103" defer></script>
-<script src="inscripcion.js?v=transferencias-104" defer></script>
+<script src="inscripcion.js?v=socios-por-jugador-105" defer></script>
 </html>
 
 

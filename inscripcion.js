@@ -39,7 +39,8 @@ function calculate(players, member, day = madridDate()) {
   const siblings = players.length > 1;
   const lines = players.map(player => {
     const exempt = player.team === 'national';
-    const discount = exempt ? 0 : (siblings ? 10 : 0) + (member ? 10 : 0);
+    const playerMember = player.member ?? member;
+    const discount = exempt ? 0 : (siblings ? 10 : 0) + (playerMember ? 10 : 0);
     const payments = exempt ? [0,0,0] : [...player.category.installments];
     if (player.hasKit) payments[0] = 0;
     payments[2] -= discount;
@@ -55,9 +56,9 @@ function calculate(players, member, day = madridDate()) {
       payments[0] += payments[1];
       payments[1] = 0;
     }
-    return {...player, discount, payments, total: payments.reduce((sum, value) => sum + value, 0)};
+    return {...player, member: playerMember, discount, payments, total: payments.reduce((sum, value) => sum + value, 0)};
   });
-  return {lines, laterDiscount: member ? 0 : Math.min(20, eligible.length * 10)};
+  return {lines, laterDiscount: Math.min(20, eligible.filter(player => !(player.member ?? member)).length * 10)};
 }
 function normalizeIdentifier(value) {
   return String(value || '').replace(/[\s.-]/g, '').toUpperCase();
@@ -423,6 +424,8 @@ if (typeof document !== 'undefined') {
     const mode = minor ? 'guardian' : dated.length ? 'adult' : null;
     const fields = document.querySelector('#contactFields');
     fields.hidden = !mode;
+    document.querySelector('#guardianMemberField').hidden = !minor;
+    form.elements.member.disabled = !minor;
     for (const name of ['contact', 'contactIdentifier', 'email', 'phone']) form.elements[name].disabled = !mode;
     if (!mode) return;
     if (contactMode === 'guardian' && mode !== 'guardian') {
@@ -445,9 +448,6 @@ if (typeof document !== 'undefined') {
     document.querySelector('#contactHelp').textContent = minor
       ? 'Introduce los datos del Padre/Madre/Tutor responsable de los menores. Los usaremos también si creas una cuenta del club.'
       : 'Datos de contacto de ' + (form.elements.contact.value || 'la persona inscrita') + '. Para crear la cuenta usaremos su nombre y DNI/NIE, que ya has indicado arriba.';
-    document.querySelector('#memberLabel').textContent = minor
-      ? 'El jugador o su Padre/Madre/Tutor ya es socio del club'
-      : 'El jugador ya es socio del club';
   }
   function renumber() {
     [...container.children].forEach((player, index) => {
@@ -466,6 +466,10 @@ if (typeof document !== 'undefined') {
     const birth = field(player, 'birth').value;
     const age = ageOnDate(birth);
     const minor = age !== null && age < 18;
+    const ownMembership = field(player, 'ownMember');
+    const ownMembershipVisible = age !== null;
+    ownMembership.disabled = !ownMembershipVisible;
+    player.querySelector('.own-membership').hidden = !ownMembershipVisible;
     const noPlayerId = field(player, 'noPlayerId');
     noPlayerId.disabled = !minor;
     if (!minor) noPlayerId.checked = false;
@@ -552,6 +556,8 @@ if (typeof document !== 'undefined') {
     const players = [...container.children].map(player => ({
       name: field(player, 'playerName').value.trim(),
       birth: field(player, 'birth').value,
+      member: field(player, 'ownMember').checked ||
+        (ageOnDate(field(player, 'birth').value) < 18 && form.elements.member.checked),
       category: categoryFor(field(player, 'birth').value),
       division: field(player, 'division').value,
       team: field(player, 'team').disabled ? 'standard' : field(player, 'team').value,
@@ -654,11 +660,11 @@ if (typeof document !== 'undefined') {
     const testData = {
       registration_day: day,
       payment,
-      member: form.elements.member.checked,
+      member: false,
       total,
       players: calculated.lines.map(line => ({
         name: line.name.slice(0, 120),
-        category: line.category.name, team: line.team, division: line.division, hasKit: line.hasKit,
+        category: line.category.name, team: line.team, division: line.division, hasKit: line.hasKit, member: line.member,
         ...(!line.hasKit && { equipment: {
           role: line.kitRole, printName: line.printName, fitted: line.fitted,
           shirt: line.fitted ? '' : line.shirt, trousers: line.fitted ? '' : line.shorts,
