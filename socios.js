@@ -83,7 +83,7 @@ for (const form of [profile, renewal]) {
     if (kind === 'renew') {
       const controls = [...form.elements, ...choices];
       controls.forEach(control => { control.disabled = true; });
-      statusMessage.textContent = 'Comprobando el padrón de 2026/2027…';
+      statusMessage.textContent = 'Comprobando el histórico de socios…';
       try {
         const result = await fetch(new URL('/rest/v1/rpc/bm_pinto_check_membership_test_renewal', api), {
           method: 'POST',
@@ -94,7 +94,7 @@ for (const form of [profile, renewal]) {
         if (result.status === 429) throw Error('Hay demasiadas consultas. Inténtalo dentro de un minuto.');
         if (!result.ok) throw Error('No se pudo comprobar el padrón. Inténtalo de nuevo.');
         if (await result.json() !== true) {
-          statusMessage.textContent = 'Ese documento no consta en el padrón de 2026/2027. Revisa el DNI o NIE o contacta con el club.';
+          statusMessage.textContent = 'Ese documento no consta en las temporadas admitidas para renovar. Revisa el DNI o NIE o contacta con el club.';
           return;
         }
       } catch (error) {
@@ -113,7 +113,7 @@ for (const form of [profile, renewal]) {
           (reservation.pending_installment_discount > 0
             ? ' Al validar el justificante, se aplicará un ajuste de ' + currency.format(reservation.pending_installment_discount) + ' en la última cuota de la inscripción.' : '')
           : 'Cuota anual general: 35 €.')
-      : 'Renovación comprobada en el padrón de 2026/2027 · Cuota anual general: 35 €.';
+      : 'Renovación comprobada en el histórico de socios · Cuota anual general: 35 €.';
     clearStatus();
     form.hidden = true;
     receiptStep.hidden = false;
@@ -155,7 +155,7 @@ receiptStep.onsubmit = async event => {
           failure.message === 'Adjunta un justificante de hasta 5 MB') {
         throw Error('El archivo adjunto debe ser un PDF, JPG o PNG de hasta 5 MB.');
       }
-      if (failure.message === 'El documento no consta en el padrón de 2026/2027') {
+      if (failure.message === 'El documento no consta en el padrón de 2026/2027' || failure.message === 'El documento no consta en el padrón histórico de socios') {
         throw Error('El documento no consta en el padrón anterior. Revisa el DNI o NIE o contacta con el club.');
       }
       if (failure.code === 'PGRST202') throw Error('El envío de solicitudes aún no está habilitado en Supabase.');
