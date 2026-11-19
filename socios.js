@@ -114,6 +114,8 @@ for (const form of [profile, renewal]) {
             ? ' Al validar el justificante, se aplicará un ajuste de ' + currency.format(reservation.pending_installment_discount) + ' en la última cuota de la inscripción.' : '')
           : 'Cuota anual general: 35 €.')
       : 'Renovación comprobada en el histórico de socios · Cuota anual general: 35 €.';
+    window.ClubTransfers.render(document.querySelector('#transferDetails'),
+      'SOCIO 2027/2028 ' + (kind === 'new' ? data.fullName.trim() : normalized));
     clearStatus();
     form.hidden = true;
     receiptStep.hidden = false;

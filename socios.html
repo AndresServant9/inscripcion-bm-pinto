@@ -11,6 +11,7 @@ if (location.origin === 'https://andresservant9.github.io') {
 }
 </script>
 <title>Socios 2027/2028 · Club Balonmano Pinto</title>
+<link rel="stylesheet" href="transferencias.css?v=104">
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: #f4f2ee; color: #242424; font: 1rem/1.5 system-ui, sans-serif; }
@@ -80,6 +81,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
     <form id="receiptStep" hidden>
       <h2>Revisar solicitud y adjuntar justificante</h2>
       <p id="requestSummary"></p>
+      <div id="transferDetails"></div>
       <label>Justificante obligatorio (PDF, JPG o PNG, máximo 5 MB)
         <input name="receipt" type="file" accept=".pdf,.jpg,.jpeg,.png" required>
       </label>
@@ -89,8 +91,9 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
     </form>
   </section>
 </main>
+<script src="transferencias.js?v=104" defer></script>
 <script src="justificantes.js?v=103" defer></script>
-<script src="socios.js?v=justificantes-103" defer></script>
+<script src="socios.js?v=transferencias-104" defer></script>
 </html>
 
 

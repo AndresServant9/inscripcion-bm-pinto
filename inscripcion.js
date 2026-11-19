@@ -639,6 +639,9 @@ if (typeof document !== 'undefined') {
     const familyPayments = scheduledPayments(deadlines.map((date, index) =>
       calculated.lines.reduce((sum, line) => sum + line.payments[index], 0)), deadlines);
     document.querySelector('#total').textContent = undecided ? 'Total pendiente de confirmar el equipo' : 'TOTAL A PAGAR · ' + euro.format(total);
+    const transferDetails = document.querySelector('#transferDetails');
+    transferDetails.hidden = undecided || total <= 0;
+    if (!transferDetails.hidden) window.ClubTransfers.render(transferDetails);
     document.querySelector('#schedule').textContent = undecided ? '' : payment === 'single'
       ? 'Pago único de ' + euro.format(total) + ' ' + singleDeadline + '.'
       : familyPayments.map(({deadline, label, amount}) => label + ' · ' + euro.format(amount) + ' ' + deadline).join(' | ');
