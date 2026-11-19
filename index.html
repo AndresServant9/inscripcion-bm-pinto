@@ -47,11 +47,9 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 </nav>
 </header>
 <nav class="authorization" aria-label="Inscripciones del club"><a href="mis-inscripciones.html">Mis inscripciones</a></nav>
-<p>Prototipo con datos ficticios. Las cuotas, fechas y años de nacimiento son orientativos.</p>
+<p>Completa los datos del jugador, revisa los pagos y confirma la inscripción con tu cuenta del club.</p>
 <button type="button" data-privacy>Leer el aviso de privacidad</button>
 <form id="registration">
-<button type="button" class="secondary" id="fillTestRegistration">Rellenar con datos ficticios</button>
-<small id="testRegistrationStatus" role="status"></small>
 <div id="players"></div>
 <button type="button" class="secondary" id="add">Añadir otro jugador</button>
 <fieldset id="contactFields" hidden><legend id="contactLegend">Padre/Madre/Tutor</legend>
@@ -103,11 +101,11 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 </fieldset>
 <div class="review-actions">
 <button type="button" class="secondary" id="editRegistration">Volver a editar</button>
-<button type="button" id="confirmRegistration">Enviar inscripción de prueba</button>
+<button type="button" id="confirmRegistration">Confirmar inscripción</button>
 <a id="openMyRegistrations" class="action-link" href="mis-inscripciones.html" hidden>Ver mis inscripciones</a>
 <button type="button" id="printRegistration" hidden>Imprimir o guardar como PDF</button>
 </div>
-<small>El club recibe la ficha de prueba y las autorizaciones. Usa datos ficticios.</small>
+<small>El club recibirá la ficha, las autorizaciones y los justificantes que adjuntes.</small>
 </section>
 </main>
 <template id="player">
@@ -171,14 +169,14 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
 <dialog id="privacyDetails" aria-labelledby="privacyTitle">
 <h2 id="privacyTitle">Aviso de privacidad</h2>
 <p><strong>Responsable</strong> · Club Balonmano Pinto, NIF G80491095, Calle Asturias, s/n, 28320 Pinto. <a href="mailto:balonmanopinto1@gmail.com">balonmanopinto1@gmail.com</a>.</p>
-<p>Este prototipo guarda la ficha de prueba, incluidos los datos de contacto, identificación, equipación, salud y autorizaciones. Usa solo datos ficticios para rellenarla. La cuenta del club se verifica por separado.</p>
-<p>En la inscripción definitiva, el club utilizará los datos necesarios para gestionar el alta y la actividad deportiva. La publicación de imágenes dependerá de tu elección. Puedes retirar ese permiso escribiendo al correo del club. Elegir «No» permite continuar con la inscripción.</p>
+<p>Este formulario recoge los datos de contacto, identificación, equipación, salud y autorizaciones necesarios para tramitar la inscripción. La cuenta del club utiliza la verificación de correo electrónico.</p>
+<p>El club utilizará los datos necesarios para gestionar el alta y la actividad deportiva. La publicación de imágenes dependerá de tu elección. Puedes retirar ese permiso escribiendo al correo del club. Elegir «No» permite continuar con la inscripción.</p>
 <p>Antes de abrir la inscripción, el club completará este aviso con las bases jurídicas, los destinatarios, los criterios de conservación y el tratamiento específico de los datos de salud.</p>
 <p>Puedes dirigirte al club para ejercer tus derechos de protección de datos y presentar una reclamación ante la <a href="https://www.aepd.es/" target="_blank" rel="noopener noreferrer">Agencia Española de Protección de Datos</a>.</p>
 <p><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es" target="_blank" rel="noopener noreferrer">Reglamento General de Protección de Datos</a> · <a href="https://boe.es/eli/es/lo/2018/12/05/3/con" target="_blank" rel="noopener noreferrer">Ley Orgánica 3/2018</a></p>
 <form method="dialog"><button autofocus>Cerrar</button></form>
 </dialog>
-<script src="inscripcion.js?v=documentos-referencias-82"></script>
+<script src="inscripcion.js?v=interfaz-publica-89"></script>
 </html>
 
 
