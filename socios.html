@@ -23,7 +23,10 @@ if (location.origin === 'https://andresservant9.github.io') {
   h1, h2 { margin: 0 0 .5rem; line-height: 1.2; }
   label { display: grid; gap: .35rem; margin: .75rem 0; font-weight: 650; }
   input, button { font: inherit; padding: .6rem; border-radius: .5rem; }
-  input:not([type="radio"]) { width: 100%; border: 1px solid #aaa49e; }
+  input:not([type="radio"]):not([type="checkbox"]) { width: 100%; border: 1px solid #aaa49e; }
+  label.consent { display: flex; align-items: flex-start; gap: .65rem; }
+  .consent input[type="checkbox"] { flex: 0 0 auto; width: 1.15rem; height: 1.15rem; padding: 0; margin: .2rem 0 0; }
+  .consent span { min-width: 0; }
   button { border: 0; background: #a60832; color: white; font-weight: 650; cursor: pointer; }
   button:disabled { opacity: .6; }
   a { color: #a60832; }
@@ -87,7 +90,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
       <label>Justificante obligatorio (PDF, JPG o PNG, máximo 5 MB)
         <input name="receipt" type="file" accept=".pdf,.jpg,.jpeg,.png" required>
       </label>
-      <label><input name="privacyRead" type="checkbox" required> He leído el <a href="privacidad.html" target="_blank" rel="noopener noreferrer">aviso de privacidad</a> para tramitar mi solicitud de socio.</label>
+      <label class="consent"><input name="privacyRead" type="checkbox" required><span>He leído el <a href="privacidad.html" target="_blank" rel="noopener noreferrer">aviso de privacidad</a> para tramitar mi solicitud de socio.</span></label>
       <button type="submit">Enviar solicitud</button>
       <button id="editRequest" type="button">Volver a editar</button>
     </form>
