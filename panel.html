@@ -68,6 +68,14 @@ if (location.origin === 'https://andresservant9.github.io') {
   #reminderPreview { margin-block: 1rem; }
   .scheduled { border-top: 1px solid #e4e0da; padding-top: 1rem; margin-top: 1rem; }
   [hidden] { display: none !important; }
+  .panel-tabs { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .panel-tabs [aria-selected="false"] { background: white; color: #242424; border-color: #b9b4ad; }
+  .panel-navigation { position: sticky; top: 0; z-index: 5; box-shadow: 0 3px 12px #0000000a; }
+  .panel-navigation .section-heading { margin: 0; gap: .75rem; }
+  .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; margin: 1rem 0; }
+  .pagination p { margin: 0; }
+  .results-note { font-size: .85rem; color: #534d47; }
+  #registrationList > summary { padding: .65rem 0; }
 </style>
 
 <style>
@@ -96,9 +104,20 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
   </form>
   <p id="status" role="status"></p>
   <section id="panel" hidden>
+    <div class="surface panel-navigation">
+      <div class="section-heading">
+        <div class="panel-tabs" role="tablist" aria-label="Gestión del club">
+          <button id="tabRegistrations" type="button" role="tab" aria-selected="true" aria-controls="registrationsPane" data-panel-tab="registrationsPane">Inscripciones</button>
+          <button id="tabMembers" type="button" role="tab" aria-selected="false" aria-controls="membersPane" data-panel-tab="membersPane" tabindex="-1">Socios</button>
+          <button id="tabReminders" type="button" role="tab" aria-selected="false" aria-controls="remindersPane" data-panel-tab="remindersPane" tabindex="-1">Recordatorios</button>
+        </div>
+        <button id="logout" class="secondary" type="button">Cerrar sesión</button>
+      </div>
+    </div>
+    <section id="registrationsPane" role="tabpanel" aria-labelledby="tabRegistrations">
     <section class="surface" aria-labelledby="filterHeading">
     <div class="section-heading"><h2 id="filterHeading">Buscar inscripciones</h2>
-      <button id="logout" class="secondary" type="button">Cerrar sesión</button>
+      <button id="reviewReceipts" class="secondary" type="button">Justificantes por revisar</button>
     </div>
     <div class="filter-grid">
     <label>Equipo <select id="team"><option value="">Todos los equipos</option></select></label>
@@ -156,9 +175,25 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
     <div class="results">
     <p id="count" aria-live="polite"></p>
     <p id="filteredPaymentTotals"></p>
+    <p class="results-note">Se muestran 20 inscripciones por página, de más reciente a más antigua. Los totales y las exportaciones incluyen todos los resultados de los filtros.</p>
+    <nav class="pagination" aria-label="Páginas de inscripciones">
+      <button type="button" class="secondary" data-page-previous>Anterior</button>
+      <p data-page-information role="status"></p>
+      <button type="button" class="secondary" data-page-next>Siguiente</button>
+    </nav>
+    <details id="registrationList" open><summary>Listado de inscripciones</summary>
+    <p id="emptyRegistrations" hidden>No hay inscripciones que coincidan con estos filtros.</p>
     <ul id="registrations"></ul>
+    </details>
+    <nav class="pagination" aria-label="Páginas de inscripciones al final del listado">
+      <button type="button" class="secondary" data-page-previous>Anterior</button>
+      <p data-page-information></p>
+      <button type="button" class="secondary" data-page-next>Siguiente</button>
+    </nav>
     </div>
     </section>
+    </section>
+    <section id="membersPane" role="tabpanel" aria-labelledby="tabMembers" hidden>
     <details class="surface">
       <summary>Descuento de prueba por alta de socio</summary>
       <p>Consulta el descuento previsto para el correo verificado de la cuenta familiar.</p>
@@ -168,7 +203,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
       </form>
       <p id="membershipRedemptionStatus" role="status"></p>
     </details>
-    <details class="surface">
+    <details class="surface" open>
       <summary>Solicitudes de socios 2027/2028</summary>
       <button id="loadMembershipRequests" type="button">Consultar solicitudes</button>
       <p id="membershipRequestStatus" role="status"></p>
@@ -186,7 +221,9 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
         <p id="renewalDirectoryStatus" role="status"></p>
       </details>
     </details>
-    <details id="reminders" class="surface">
+    </section>
+    <section id="remindersPane" role="tabpanel" aria-labelledby="tabReminders" hidden>
+    <details id="reminders" class="surface" open>
       <summary>Vista previa de recordatorios de cuotas</summary>
       <p>Consulta qué cuotas vencerían 7 días después de la fecha elegida.</p>
       <form id="reminderPreview" class="inline-fields">
@@ -200,11 +237,13 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
       <p id="scheduledReminderStatus" role="status"></p>
       </div>
     </details>
+    </section>
   </section>
 </main>
 <script src="exportar-packs.js?v=c53ae8de7940" defer></script>
-<script src="panel.js?v=campana-activa-2027" defer></script>
+<script src="panel.js?v=pestanas-paginacion-83" defer></script>
 </html>
+
 
 
 
