@@ -59,12 +59,25 @@ function calculate(players, member, day = madridDate()) {
   });
   return {lines, laterDiscount: member ? 0 : Math.min(20, eligible.length * 10)};
 }
+function normalizeIdentifier(value) {
+  return String(value || '').replace(/[\s.-]/g, '').toUpperCase();
+}
+function isValidIdentifier(value) {
+  const document = normalizeIdentifier(value);
+  if (!/^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Z]$/.test(document)) return false;
+  const digits = document.slice(0, -1).replace(/^[XYZ]/, letter => ({X: '0', Y: '1', Z: '2'})[letter]);
+  return 'TRWAGMYFPDXBNJZSQVHLCKE'[Number(digits) % 23] === document.slice(-1);
+}
+function testIdentifier() {
+  const number = Math.floor(Math.random() * 100000000);
+  return String(number).padStart(8, '0') + 'TRWAGMYFPDXBNJZSQVHLCKE'[number % 23];
+}
 function scheduledPayments(amounts, deadlines) {
   return amounts.map((amount, index) => ({amount, deadline: deadlines[index]}))
     .filter(payment => payment.amount > 0)
     .map((payment, index) => ({...payment, label: 'Pago ' + (index + 1)}));
 }
-if (typeof module !== 'undefined') module.exports = {categoryFor, calculate, singlePaymentDeadline, scheduledPayments};
+if (typeof module !== 'undefined') module.exports = {categoryFor, calculate, singlePaymentDeadline, scheduledPayments, isValidIdentifier, testIdentifier};
 if (typeof document !== 'undefined') {
   const form = document.querySelector('#registration');
   const container = document.querySelector('#players');
@@ -81,6 +94,31 @@ if (typeof document !== 'undefined') {
       element.focus({preventScroll: true});
       element.scrollIntoView({block: 'center', behavior: 'smooth'});
     }
+  }
+  function validateDocument(input) {
+    const valid = input.disabled || (!input.required && !input.value.trim()) || isValidIdentifier(input.value);
+    const text = valid ? '' : 'DNI/NIE incorrecto. Revisa el número y la letra.';
+    input.setCustomValidity(text);
+    input.setAttribute('aria-invalid', String(!valid));
+    input.documentError.textContent = text;
+    input.documentError.hidden = valid;
+    return valid;
+  }
+  function bindDocument(input) {
+    const error = document.createElement('small');
+    error.className = 'form-message document-error';
+    error.dataset.kind = 'error';
+    error.hidden = true;
+    error.id = 'document-error-' + crypto.randomUUID();
+    input.insertAdjacentElement('afterend', error);
+    input.documentError = error;
+    input.setAttribute('aria-describedby', [input.getAttribute('aria-describedby'), error.id].filter(Boolean).join(' '));
+    input.addEventListener('blur', () => validateDocument(input));
+    input.addEventListener('invalid', () => validateDocument(input));
+    input.addEventListener('input', () => {
+      input.setCustomValidity('');
+      if (input.getAttribute('aria-invalid') === 'true') validateDocument(input);
+    });
   }
   const confirmRegistration = document.querySelector('#confirmRegistration');
   const printRegistration = document.querySelector('#printRegistration');
@@ -119,6 +157,8 @@ if (typeof document !== 'undefined') {
   const signup = document.querySelector('#registrationSignup');
   const verify = document.querySelector('#registrationVerify');
   const signupStatus = document.querySelector('#registrationSignupStatus');
+  bindDocument(form.elements.contactIdentifier);
+  bindDocument(signup.elements.identifier);
   let pendingAccount;
   let clubSession;
   function prefillAccount() {
@@ -133,6 +173,11 @@ if (typeof document !== 'undefined') {
       if (!input.value || input.value === input.dataset.contactValue) {
         input.value = value;
         input.dataset.contactValue = value;
+        if (name === 'identifier') {
+          input.setCustomValidity('');
+          input.removeAttribute('aria-invalid');
+          input.documentError.hidden = true;
+        }
       }
     }
   }
@@ -154,15 +199,16 @@ if (typeof document !== 'undefined') {
     const fields = new FormData(signup);
     const email = fields.get('email').trim().toLowerCase();
     const password = fields.get('password');
-    const identifier = fields.get('identifier').replace(/[\s.-]/g, '').toUpperCase();
+    const identifier = normalizeIdentifier(fields.get('identifier'));
     const name = fields.get('fullName').trim();
     const phone = fields.get('phone').trim();
     if (!name || !phone) {
       setStatus(signupStatus, 'Introduce el nombre completo y el teléfono del titular.');
       return;
     }
-    if (!/^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Z]$/.test(identifier)) {
-      setStatus(signupStatus, 'Introduce el DNI o NIE completo del titular de la cuenta, incluida la letra.');
+    if (!isValidIdentifier(identifier)) {
+      validateDocument(signup.elements.identifier);
+      setStatus(signupStatus, 'DNI/NIE incorrecto. Revisa el número y la letra del documento del titular.');
       signup.elements.identifier.focus();
       return;
     }
@@ -291,7 +337,7 @@ if (typeof document !== 'undefined') {
       const reference = await response.json();
       if (typeof reference !== 'string' || !reference.startsWith('INS-PRUEBA-')) throw Error('No se pudo comprobar la recepción.');
       if (reviewedRegistration?.id !== registration.id) return;
-      setStatus(reviewStatus, 'Prueba recibida por el club. Referencia ' + reference + '.' +
+      setStatus(reviewStatus, 'Inscripción recibida correctamente por el club.' +
         ' Ya está disponible en Mis inscripciones.' +
         (needsReceipt ? ' Justificante recibido para revisión.' : ''), 'success');
       firstReceipt.value = '';
@@ -400,6 +446,11 @@ if (typeof document !== 'undefined') {
     const playerId = field(player, 'playerId');
     playerId.disabled = noPlayerId.checked;
     playerId.required = !noPlayerId.checked;
+    if (playerId.disabled) {
+      playerId.setCustomValidity('');
+      playerId.documentError.hidden = true;
+      playerId.removeAttribute('aria-invalid');
+    }
     const reportHealth = field(player, 'hasHealth').value === 'yes';
     const health = field(player, 'health');
     health.disabled = !reportHealth;
@@ -431,6 +482,7 @@ if (typeof document !== 'undefined') {
   }
   function addPlayer() {
     const player = document.querySelector('#player').content.firstElementChild.cloneNode(true);
+    bindDocument(field(player, 'playerId'));
     for (const [name, options] of [
       ['shirt', ['7/8 XS','5/6 XS','3/4 XS',...sizes,'4XL']],
       ['shorts', ['6/5 XS','4/3 XS',...sizes]],
@@ -464,7 +516,7 @@ if (typeof document !== 'undefined') {
         playerName: 'Jugador de prueba ' + suffix,
         birth: choose(['2011', '2013', '2015', '2017']) + '-' + choose(['02', '05', '09']) + '-15',
         division: choose(['female', 'male']),
-        playerId: 'PRUEBA' + suffix,
+        playerId: testIdentifier(),
         address: 'Domicilio ficticio ' + suffix,
         town,
         otherTown: '',
@@ -480,12 +532,14 @@ if (typeof document !== 'undefined') {
         images: 'No',
       };
       for (const [name, value] of Object.entries(values)) field(player, name).value = value;
+      validateDocument(field(player, 'playerId'));
       field(player, 'noPlayerId').checked = false;
       field(player, 'fitted').checked = false;
       updatePlayer(player);
     }
     form.elements.contact.value = 'Responsable de prueba ' + code();
-    form.elements.contactIdentifier.value = '00000000T';
+    form.elements.contactIdentifier.value = testIdentifier();
+    validateDocument(form.elements.contactIdentifier);
     summary.hidden = true;
     document.querySelector('#testRegistrationStatus').textContent =
       'Datos ficticios rellenados. Revisa el correo y pulsa Revisar inscripción.';
@@ -496,6 +550,13 @@ if (typeof document !== 'undefined') {
   form.onsubmit = event => {
     event.preventDefault();
     updateContact();
+    const documents = [...container.querySelectorAll('[name="playerId"]'), form.elements.contactIdentifier];
+    const invalidDocument = documents.map(input => ({input, valid: validateDocument(input)})).find(result => !result.valid);
+    if (invalidDocument) {
+      invalidDocument.input.focus();
+      invalidDocument.input.reportValidity();
+      return;
+    }
     prefillAccount();
     const players = [...container.children].map(player => ({
       name: field(player, 'playerName').value.trim(),
