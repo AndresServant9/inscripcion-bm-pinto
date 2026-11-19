@@ -25,6 +25,7 @@ function selectPanel(id) {
     tab.tabIndex = selected ? 0 : -1;
     get(tab.dataset.panelTab).hidden = !selected;
   }
+  if (id === 'membersPane' && token && !memberLoaded) loadMembers();
 }
 for (const [index, tab] of panelTabs.entries()) {
   tab.addEventListener('click', () => selectPanel(tab.dataset.panelTab));
@@ -876,29 +877,61 @@ get('reminderPreview').onsubmit = async event => {
   }
 };
 get('reference').addEventListener('input', resetPageAndRender);
-get('loadMembershipRequests').onclick = async () => {
-  const requestMembershipCard = (id, campaign) => request('/functions/v1/' +
-    (campaign ? 'enviar-carne-socio-campana' : 'enviar-carne-socio-prueba'), {id});
+let memberRows = [];
+let memberRoutes = {};
+let memberPage = 1;
+let memberLoaded = false;
+let memberLoadRevision = 0;
+let memberSearchRevision = 0;
+let memberDocumentIds = null;
+let memberLookupBusy = false;
+let memberActionBusy = false;
+function membershipState(row) {
+  return row.rejected_at ? 'rejected' : row.approved_at ? 'approved' : row.awaiting_receipt ? 'awaiting' : 'pending';
+}
+function memberDocumentQuery() {
+  const normalized = get('memberSearch').value.replace(/[\s.-]/g, '').toUpperCase();
+  return /^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Z]$/.test(normalized) ? normalized : '';
+}
+function filteredMembers() {
+  const query = searchableName(get('memberSearch').value.trim());
+  const state = get('memberState').value;
+  const kind = get('memberKind').value;
+  const byDocument = Boolean(memberDocumentQuery());
+  return memberRows.filter(row => (!state || membershipState(row) === state) && (!kind || row.kind === kind) &&
+    (byDocument ? memberDocumentIds?.has(row.id) : !query ||
+      searchableName([row.profile?.fullName, row.profile?.email].filter(Boolean).join(' ')).includes(query)));
+}
+function renderMembers() {
+  if (memberActionBusy) return;
   const session = token;
-  if (!session) return;
   const status = get('membershipRequestStatus');
   const list = get('membershipRequests');
-  const loadButton = get('loadMembershipRequests');
-  loadButton.disabled = true;
-  status.textContent = 'Consultando solicitudes…';
-  try {
-    const requests = await rpc('bm_pinto_review_membership_test', {p_id: null});
-    const routes = await rpc('bm_pinto_membership_card_routes', {});
-    if (token !== session) return;
-    list.replaceChildren();
-    status.textContent = requests.length + (requests.length === 1 ? ' solicitud' : ' solicitudes');
+  const routes = memberRoutes;
+  const filtered = filteredMembers();
+  const pagination = paginateRegistrations(filtered, memberPage);
+  memberPage = pagination.page;
+  const requests = pagination.entries;
+  list.replaceChildren();
+  const counts = state => memberRows.filter(row => membershipState(row) === state).length;
+  get('membershipCounts').textContent = memberLoaded ? memberRows.length + ' solicitudes en total · ' +
+    counts('pending') + ' pendientes de validar · ' + counts('awaiting') + ' pendientes de justificante · ' +
+    counts('approved') + ' validadas · ' + counts('rejected') + ' rechazadas' : '';
+  get('memberPrevious').disabled = memberPage === 1 || memberLookupBusy;
+  get('memberNext').disabled = memberPage === pagination.pages || memberLookupBusy;
+  get('memberPageInformation').textContent = memberLookupBusy ? 'Buscando DNI/NIE…' : !memberLoaded ? 'Consulta las solicitudes para empezar.' :
+    filtered.length ? 'Página ' + memberPage + ' de ' + pagination.pages + ' · Mostrando ' + (pagination.start + 1) + '–' +
+    (pagination.start + requests.length) + ' de ' + filtered.length : 'No hay solicitudes que coincidan con estos filtros.';
+  const requestMembershipCard = (id, campaign) => request('/functions/v1/' +
+    (campaign ? 'enviar-carne-socio-campana' : 'enviar-carne-socio-prueba'), {id});
     for (const request of requests) {
       const campaign = routes[request.id]?.campaign === true;
       if (campaign) request.card_state = routes[request.id].state;
       const entry = item('li', '');
-      const title = request.kind === 'renew'
-        ? ['Renovación', request.profile?.fullName].filter(Boolean).join(' · ')
-        : 'Alta · ' + request.profile.fullName;
+      entry.dataset.memberId = request.id;
+      entry.tabIndex = -1;
+      const title = [request.kind === 'renew' ? 'Renovación' : 'Alta',
+        request.profile?.fullName || request.profile?.email || 'Datos pendientes de completar'].join(' · ');
       const result = item('p', request.rejected_at ? 'Rechazada' : request.approved_at ? 'Validada' :
         request.awaiting_receipt ? 'Descuento reservado · Pendiente de justificante' : 'Pendiente de revisión');
       const discounts = item('p', '');
@@ -932,10 +965,14 @@ get('loadMembershipRequests').onclick = async () => {
           const result = await requestMembershipCard(request.id, campaign);
           if (token !== session || !entry.isConnected) return;
           cardStatus.textContent = result.message;
+          request.card_state = 'sent';
+          if (routes[request.id]) routes[request.id].state = 'sent';
           sendCard.hidden = true;
+          return true;
         } catch (error) {
           if (token !== session || !entry.isConnected) return;
           cardStatus.textContent = error.serverMessage || 'No se confirmó el envío. Comprueba el buzón de prueba.';
+          return false;
         } finally {
           sendCard.disabled = false;
         }
@@ -949,7 +986,7 @@ get('loadMembershipRequests').onclick = async () => {
       const download = item('button', 'Descargar justificante');
       download.type = 'button';
       download.hidden = Boolean(request.awaiting_receipt);
-      const approve = item('button', campaign ? 'Validar solicitud y enviar carné' : 'Validar solicitud de prueba');
+      const approve = item('button', 'Validar y ver siguiente');
       approve.type = 'button';
       approve.hidden = Boolean(request.approved_at || request.rejected_at || request.awaiting_receipt ||
         (request.kind === 'renew' && (!request.previous_member || !request.profile?.email)));
@@ -958,18 +995,23 @@ get('loadMembershipRequests').onclick = async () => {
       rejectRequest.className = 'secondary';
       rejectRequest.hidden = Boolean(request.approved_at || request.rejected_at);
       rejectRequest.onclick = async () => {
+        if (memberActionBusy) return;
         if (!window.confirm('¿Rechazar esta solicitud de prueba? El socio podrá enviar una nueva con el mismo documento.')) return;
+        memberActionBusy = true;
         approve.disabled = rejectRequest.disabled = true;
         try {
           const rejected = await rpc('bm_pinto_reject_membership_test', {p_id: request.id});
           if (token !== session || !entry.isConnected) return;
           if (!rejected) throw Error('La solicitud ya cambió de estado.');
           result.textContent = 'Rechazada · Se puede enviar una nueva solicitud';
+          request.rejected_at = new Date().toISOString();
           approve.hidden = rejectRequest.hidden = true;
         } catch {
           if (token === session && entry.isConnected) status.textContent = 'No se pudo rechazar. Consulta de nuevo las solicitudes.';
         } finally {
           approve.disabled = rejectRequest.disabled = false;
+          memberActionBusy = false;
+          if (token === session) renderMembers();
         }
       };
       download.onclick = async () => {
@@ -993,34 +1035,114 @@ get('loadMembershipRequests').onclick = async () => {
         }
       };
       approve.onclick = async () => {
-        if (!window.confirm('¿Has comprobado el ingreso de esta solicitud de prueba?')) return;
+        if (memberActionBusy) return;
+        if (!window.confirm('¿Has comprobado el ingreso? Se validará esta solicitud, se enviará el carné y se mostrará la siguiente pendiente.')) return;
+        memberActionBusy = true;
         approve.disabled = rejectRequest.disabled = true;
+        status.textContent = 'Validando solicitud…';
+        const queue = filteredMembers();
+        const position = queue.findIndex(row => row.id === request.id);
+        const nextIds = queue.slice(position + 1).concat(queue.slice(0, position))
+          .filter(row => membershipState(row) === 'pending').map(row => row.id);
+        let approved = false;
         try {
           const validated = await rpc('bm_pinto_review_membership_test', {p_id: request.id, p_approve: true});
           if (token !== session || !entry.isConnected) return;
           if (!validated?.approved_at) throw Error('Solicitud no disponible');
+          Object.assign(request, validated);
+          approved = true;
           approve.hidden = true;
           rejectRequest.hidden = true;
           result.textContent = 'Validada';
           showMembershipDiscounts(validated);
           sendCard.hidden = false;
-          await sendApprovedCard();
+          const sent = await sendApprovedCard();
+          if (token === session) status.textContent = sent ? 'Solicitud validada y carné enviado.' :
+            'Solicitud validada. No se confirmó el envío del carné; compruébalo en el filtro Validadas antes de repetirlo.';
         } catch {
-          if (token === session) status.textContent = 'No se pudo validar la solicitud.';
+          if (token === session) status.textContent = approved
+            ? 'Solicitud validada. Consulta el estado del carné en Validadas.' : 'No se pudo validar la solicitud. Actualiza antes de reintentarlo.';
         } finally {
           approve.disabled = rejectRequest.disabled = false;
+          memberActionBusy = false;
+          if (token === session) {
+            const remaining = filteredMembers();
+            const next = nextIds.map(id => remaining.find(row => row.id === id)).find(Boolean);
+            if (approved && next) memberPage = Math.floor(remaining.indexOf(next) / registrationPageSize) + 1;
+            renderMembers();
+            if (approved && next) get('membershipRequests').querySelector('[data-member-id="' + next.id + '"]')?.focus();
+          }
         }
       };
       entry.append(item('strong', title), item('p', 'Referencia SOCIO-PRUEBA-' + request.id));
       if (request.profile?.email) entry.append(item('p', request.profile.email));
+      if (!approve.hidden) entry.append(item('p', campaign
+        ? 'Al validar se enviará el carné al correo del socio.' : 'Esta solicitud utiliza el buzón de prueba para el carné.'));
       entry.append(result, discounts, download, ' ', approve, ' ', rejectRequest, ' ', sendCard, cardStatus);
       list.append(entry);
     }
+}
+async function searchMembers() {
+  const current = ++memberSearchRevision;
+  const session = token;
+  memberPage = 1;
+  memberDocumentIds = null;
+  const identifier = memberDocumentQuery();
+  memberLookupBusy = Boolean(identifier);
+  get('membershipRequestStatus').textContent = '';
+  renderMembers();
+  if (!identifier || !session) return;
+  try {
+    const ids = await rpc('bm_pinto_find_membership_requests', {p_identifier: identifier});
+    if (token !== session || current !== memberSearchRevision) return;
+    memberDocumentIds = new Set(ids);
   } catch {
-    if (token === session) status.textContent = 'No se pudieron consultar las solicitudes de socios.';
+    if (token !== session || current !== memberSearchRevision) return;
+    get('membershipRequestStatus').textContent = 'No se pudo buscar el documento. Comprueba que está aplicado el SQL 85 o busca por nombre o correo.';
   } finally {
-    loadButton.disabled = false;
+    if (token === session && current === memberSearchRevision) {
+      memberLookupBusy = false;
+      renderMembers();
+    }
   }
+}
+async function loadMembers() {
+  const session = token;
+  if (!session || memberActionBusy) return;
+  const revision = ++memberLoadRevision;
+  const button = get('loadMembershipRequests');
+  button.disabled = true;
+  get('membershipRequestStatus').textContent = 'Consultando solicitudes…';
+  try {
+    const [requests, routes] = await Promise.all([
+      rpc('bm_pinto_review_membership_test', {p_id: null}), rpc('bm_pinto_membership_card_routes', {}),
+    ]);
+    if (token !== session || revision !== memberLoadRevision) return;
+    memberRows = requests;
+    memberRoutes = routes;
+    memberLoaded = true;
+    get('membershipRequestStatus').textContent = '';
+    if (memberDocumentQuery()) await searchMembers();
+    else renderMembers();
+  } catch {
+    if (token === session) get('membershipRequestStatus').textContent = 'No se pudieron consultar las solicitudes de socios.';
+  } finally {
+    button.disabled = false;
+  }
+}
+get('loadMembershipRequests').onclick = loadMembers;
+get('memberSearch').addEventListener('input', searchMembers);
+for (const id of ['memberState', 'memberKind']) get(id).addEventListener('change', () => {memberPage = 1; renderMembers();});
+get('clearMemberFilters').onclick = () => {
+  get('memberSearch').value = '';
+  get('memberState').value = 'pending';
+  get('memberKind').value = '';
+  searchMembers();
+};
+for (const [id, offset] of [['memberPrevious', -1], ['memberNext', 1]]) get(id).onclick = () => {
+  memberPage += offset;
+  renderMembers();
+  get('memberPageInformation').scrollIntoView({block: 'center'});
 };
 get('refresh').addEventListener('click', async () => {
   try {
@@ -1031,8 +1153,21 @@ get('refresh').addEventListener('click', async () => {
   }
 });
 get('logout').addEventListener('click', () => {
+  memberLoadRevision++;
+  memberSearchRevision++;
+  memberRows = [];
+  memberRoutes = {};
+  memberLoaded = false;
+  memberPage = 1;
+  memberDocumentIds = null;
+  memberLookupBusy = false;
+  memberActionBusy = false;
+  get('memberSearch').value = '';
+  get('memberState').value = 'pending';
+  get('memberKind').value = '';
   get('membershipRequests').replaceChildren();
   get('membershipRequestStatus').textContent = '';
+  get('membershipCounts').textContent = '';
   revision++;
   token = '';
   rows = [];
