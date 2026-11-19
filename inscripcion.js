@@ -68,16 +68,12 @@ function isValidIdentifier(value) {
   const digits = document.slice(0, -1).replace(/^[XYZ]/, letter => ({X: '0', Y: '1', Z: '2'})[letter]);
   return 'TRWAGMYFPDXBNJZSQVHLCKE'[Number(digits) % 23] === document.slice(-1);
 }
-function testIdentifier() {
-  const number = Math.floor(Math.random() * 100000000);
-  return String(number).padStart(8, '0') + 'TRWAGMYFPDXBNJZSQVHLCKE'[number % 23];
-}
 function scheduledPayments(amounts, deadlines) {
   return amounts.map((amount, index) => ({amount, deadline: deadlines[index]}))
     .filter(payment => payment.amount > 0)
     .map((payment, index) => ({...payment, label: 'Pago ' + (index + 1)}));
 }
-if (typeof module !== 'undefined') module.exports = {categoryFor, calculate, singlePaymentDeadline, scheduledPayments, isValidIdentifier, testIdentifier};
+if (typeof module !== 'undefined') module.exports = {categoryFor, calculate, singlePaymentDeadline, scheduledPayments, isValidIdentifier};
 if (typeof document !== 'undefined') {
   const form = document.querySelector('#registration');
   const container = document.querySelector('#players');
@@ -144,7 +140,7 @@ if (typeof document !== 'undefined') {
   function updateFirstReceipt() {
     const amount = firstReceiptAmount(reviewedRegistration);
     firstReceiptField.hidden = amount <= 0;
-    firstReceiptLabel.textContent = 'Justificante de prueba del primer pago (' +
+    firstReceiptLabel.textContent = 'Justificante del primer pago (' +
       new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount) + ') · PDF, JPG o PNG, máximo 5 MB';
   }
 
@@ -286,14 +282,14 @@ if (typeof document !== 'undefined') {
       return;
     }
     if (needsReceipt && (!file?.size || file.size > 5 * 1024 * 1024)) {
-      setStatus(reviewStatus, 'Adjunta un justificante de prueba de hasta 5 MB para el primer pago.');
+      setStatus(reviewStatus, 'Adjunta un justificante de hasta 5 MB para el primer pago.');
       firstReceipt.focus();
       return;
     }
     registrationSending = true;
     confirmRegistration.disabled = true;
     accountFields.disabled = true;
-    setStatus(reviewStatus, 'Enviando inscripción de prueba…', 'info');
+    setStatus(reviewStatus, 'Enviando inscripción…', 'info');
     try {
       const headers = {apikey: publishableKey, 'Content-Type': 'application/json'};
       let endpoint = registrationApi;
@@ -324,15 +320,15 @@ if (typeof document !== 'undefined') {
       if (!response.ok) {
         if (response.status === 401) clubSession = null;
         const failure = await response.json().catch(() => ({}));
-        if (failure.code === 'PGRST202') throw Error('Falta activar el envío de inscripciones en Supabase.');
+        if (failure.code === 'PGRST202') throw Error('El envío de inscripciones no está disponible. Contacta con el club.');
         if (failure.message === 'Ficha de prueba incorrecta') throw Error('Revisa los datos de contacto, el domicilio y las autorizaciones.');
         if (failure.code === '22P02' || failure.message === 'Jugador de prueba incorrecto') {
-          throw Error('No se pudieron validar los datos del pack. Comprueba las tallas y que se haya aplicado el SQL 49 actualizado.');
+          throw Error('No se pudieron validar los datos del pack. Revisa las tallas o contacta con el club.');
         }
         if (failure.message === 'Formato no admitido' || failure.message === 'Archivo demasiado grande') {
           throw Error('El justificante debe ser un PDF, JPG o PNG de hasta 5 MB.');
         }
-        throw Error('No se pudo enviar la prueba. Puedes reintentar el mismo envío.');
+        throw Error('No se pudo enviar la inscripción. Puedes reintentar el mismo envío.');
       }
       const reference = await response.json();
       if (typeof reference !== 'string' || !reference.startsWith('INS-PRUEBA-')) throw Error('No se pudo comprobar la recepción.');
@@ -363,7 +359,7 @@ if (typeof document !== 'undefined') {
     button.addEventListener('click', () => privacyDetails.showModal());
   }
   const authorizationTexts = {
-    nonFederatedProtocol: 'Borrador 2027/2028. Este apartado corresponde a Prebenjamín y Benjamín. Ante un accidente durante la actividad, avisa al entrenador. El club facilitará el procedimiento aplicable cuando esté confirmado.',
+    nonFederatedProtocol: 'Temporada 2027/2028. Este apartado corresponde a Prebenjamín y Benjamín. Ante un accidente durante la actividad, avisa al entrenador. El club facilitará el procedimiento aplicable cuando esté confirmado.',
 
     outings: 'Al elegir Sí, autorizas al jugador o jugadora a participar en actividades de balonmano fuera del pabellón Sandra Aguilar y a acudir a otras instalaciones deportivas bajo la supervisión del entrenador o de la persona designada por el club.',
     transport: 'Al elegir Sí, autorizas los desplazamientos a partidos o entrenamientos en coche particular de un compañero o entrenador previo acuerdo entre las partes. También autorizas los desplazamientos a torneos del club en transporte contratado o en vehículos particulares de familias o entrenadores, con información previa del viaje.',
@@ -503,48 +499,6 @@ if (typeof document !== 'undefined') {
     return field(player, 'playerName');
   }
   addPlayer();
-  document.querySelector('#fillTestRegistration').onclick = () => {
-    const choose = options => options[Math.floor(Math.random() * options.length)];
-    const code = () => String(100000 + Math.floor(Math.random() * 900000));
-    form.elements.phone.value = '000' + code();
-    form.elements.member.checked = false;
-    form.elements.payment.value = 'split';
-    for (const player of container.children) {
-      const suffix = code();
-      const town = choose(['Pinto', 'Valdemoro', 'Leganés']);
-      const values = {
-        playerName: 'Jugador de prueba ' + suffix,
-        birth: choose(['2011', '2013', '2015', '2017']) + '-' + choose(['02', '05', '09']) + '-15',
-        division: choose(['female', 'male']),
-        playerId: testIdentifier(),
-        address: 'Domicilio ficticio ' + suffix,
-        town,
-        otherTown: '',
-        registeredInPinto: town === 'Pinto' ? 'Sí' : 'No',
-        hasKit: 'no',
-        kitRole: choose(['court', 'goalkeeper']),
-        printName: 'PRUEBA ' + suffix,
-        shirt: choose(sizes),
-        shorts: choose(sizes),
-        hasHealth: 'no',
-        outings: choose(['Sí', 'No']),
-        transport: choose(['Sí', 'No']),
-        images: 'No',
-      };
-      for (const [name, value] of Object.entries(values)) field(player, name).value = value;
-      validateDocument(field(player, 'playerId'));
-      field(player, 'noPlayerId').checked = false;
-      field(player, 'fitted').checked = false;
-      updatePlayer(player);
-    }
-    form.elements.contact.value = 'Responsable de prueba ' + code();
-    form.elements.contactIdentifier.value = testIdentifier();
-    validateDocument(form.elements.contactIdentifier);
-    summary.hidden = true;
-    document.querySelector('#testRegistrationStatus').textContent =
-      'Datos ficticios rellenados. Revisa el correo y pulsa Revisar inscripción.';
-    form.elements.email.focus();
-  };
   document.querySelector('#add').onclick = () => {summary.hidden = true; addPlayer().focus();};
   form.addEventListener('input', () => {summary.hidden = true;});
   form.onsubmit = event => {
