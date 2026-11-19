@@ -28,7 +28,7 @@ function membershipRequest(row) {
   }
   if (row.approved_at && !row.rejected_at) {
     card.append(node('p', row.card_state === 'sent' ?
-      (row.is_campaign ? 'Carné enviado al correo de la solicitud.' : 'Carné de prueba enviado al buzón de pruebas.') :
+      (row.is_campaign ? 'Carné enviado al correo de la solicitud.' : 'El club está gestionando el envío del carné.') :
       'El club está gestionando el envío del carné.'));
   }
   return card;
@@ -146,7 +146,7 @@ function receiptForm(id, payment) {
   input.required = true;
   const label = node('label', 'Justificante (PDF, JPG o PNG, máximo 5 MB)');
   label.append(input);
-  const button = node('button', 'Subir justificante de prueba');
+  const button = node('button', 'Subir justificante');
   const feedback = node('p', '');
   feedback.setAttribute('role', 'status');
   upload.append(label, button, feedback);
@@ -196,7 +196,7 @@ async function loadEnrollments(session) {
     const membership = get('membershipDiscount');
     membership.hidden = !discount || Number(discount.discount) <= 0;
     membership.textContent = membership.hidden ? '' :
-      'Descuento orientativo en el alta de socio: ' + euro.format(discount.discount) + '.';
+      'Descuento previsto en el alta de socio: ' + euro.format(discount.discount) + '.';
     enrollments.replaceChildren(...rows.map(row => enrollment(row, rejections)));
     applyPaymentFilter();
   }
