@@ -76,6 +76,10 @@ if (location.origin === 'https://andresservant9.github.io') {
   .pagination p { margin: 0; }
   .results-note { font-size: .85rem; color: #534d47; }
   #registrationList > summary { padding: .65rem 0; }
+  #membershipRequests { list-style: none; padding: 0; }
+  #membershipRequests > li { padding: 1rem; margin: .8rem 0; background: #faf9f7; border: 1px solid #e4e0da; border-radius: .75rem; }
+  #membershipRequests button { margin: .25rem .25rem .25rem 0; }
+  #membershipCounts { color: #534d47; }
 </style>
 
 <style>
@@ -196,8 +200,22 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
     <section id="membersPane" role="tabpanel" aria-labelledby="tabMembers" hidden>
     <details class="surface" open>
       <summary>Solicitudes de socios 2027/2028</summary>
-      <button id="loadMembershipRequests" type="button">Consultar solicitudes</button>
+      <div class="filter-grid">
+        <label>Nombre, correo o DNI/NIE completo<input id="memberSearch" type="search" autocomplete="off"></label>
+        <label>Estado<select id="memberState"><option value="pending">Pendientes de validar</option><option value="awaiting">Pendientes de justificante</option><option value="approved">Validadas</option><option value="rejected">Rechazadas</option><option value="">Todos los estados</option></select></label>
+        <label>Trámite<select id="memberKind"><option value="">Altas y renovaciones</option><option value="new">Alta</option><option value="renew">Renovación</option></select></label>
+      </div>
+      <div class="actions" style="margin-top:1rem">
+        <button id="loadMembershipRequests" type="button">Actualizar solicitudes</button>
+        <button id="clearMemberFilters" type="button" class="secondary">Limpiar filtros</button>
+      </div>
+      <p id="membershipCounts"></p>
       <p id="membershipRequestStatus" role="status"></p>
+      <nav class="pagination" aria-label="Páginas de solicitudes de socios">
+        <button id="memberPrevious" type="button" class="secondary" disabled>Anterior</button>
+        <p id="memberPageInformation" role="status">Consulta las solicitudes para empezar.</p>
+        <button id="memberNext" type="button" class="secondary" disabled>Siguiente</button>
+      </nav>
       <ul id="membershipRequests"></ul>
     </details>
     </section>
@@ -220,7 +238,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
   </section>
 </main>
 <script src="exportar-packs.js?v=c53ae8de7940" defer></script>
-<script src="panel.js?v=socios-limpieza-84" defer></script>
+<script src="panel.js?v=gestion-socios-85" defer></script>
 </html>
 
 
