@@ -3,6 +3,10 @@ const apiKey = 'sb_publishable_U3568BhgdgCt7ysDU5l1CA_1CenKkjU';
 const get = id => document.getElementById(id);
 const form = get('signin');
 const message = get('message');
+function setMessage(text, kind = 'info') {
+  message.textContent = text;
+  message.dataset.kind = kind;
+}
 const enrollments = get('enrollments');
 const refreshEnrollments = get('refreshEnrollments');
 const euro = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
@@ -130,7 +134,7 @@ function downloadReceipt(id, payment) {
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
-      if (token === session) message.textContent = 'No se pudo descargar el justificante. Actualiza el estado de los pagos y vuelve a intentarlo.';
+      if (token === session) setMessage('No se pudo descargar el justificante. Actualiza el estado de los pagos y vuelve a intentarlo.', 'error');
     } finally {
       button.disabled = false;
     }
@@ -148,6 +152,7 @@ function receiptForm(id, payment) {
   label.append(input);
   const button = node('button', 'Subir justificante');
   const feedback = node('p', '');
+  feedback.className = 'form-message';
   feedback.setAttribute('role', 'status');
   upload.append(label, button, feedback);
   upload.onsubmit = async event => {
@@ -155,24 +160,27 @@ function receiptForm(id, payment) {
     const file = input.files[0];
     if (!file) {
       feedback.textContent = 'Selecciona un justificante PDF, JPG o PNG.';
+      feedback.dataset.kind = 'error';
       return;
     }
     const session = token;
     button.disabled = input.disabled = true;
     feedback.textContent = 'Subiendo justificante…';
+    feedback.dataset.kind = 'info';
     try {
       const encoded = await window.ClubReceipts.read(file);
       await post('/rest/v1/rpc/bm_pinto_upload_registration_test_receipt', {
         p_id: id, p_schedule: payment.schedule, p_installment: payment.installment, p_file: encoded,
       }, session);
     } catch (error) {
+      feedback.dataset.kind = 'error';
       feedback.textContent = error.name === 'ReceiptError' ? error.message
         : 'No se pudo confirmar la subida. Pulsa Actualizar estado antes de volver a subirlo, para comprobar si el justificante ya se ha recibido.';
       button.disabled = input.disabled = false;
       return;
     }
     if (token !== session) return;
-    message.textContent = 'Justificante recibido. El pago queda en revisión.';
+    setMessage('Justificante recibido. El pago queda en revisión.', 'success');
     try {
       await loadEnrollments(session);
     } catch {
@@ -226,15 +234,15 @@ refreshEnrollments.onclick = async () => {
   const session = token;
   if (!session || refreshEnrollments.disabled) return;
   refreshEnrollments.disabled = true;
-  message.textContent = 'Actualizando inscripciones y solicitudes de socio…';
+  setMessage('Actualizando inscripciones y solicitudes de socio…');
   try {
     const rows = await loadEnrollments(session);
     if (token !== session) return;
-    message.textContent = rows.length
+    setMessage(rows.length
       ? 'Estado actualizado.'
-      : 'Tu cuenta todavía no tiene inscripciones vinculadas.';
+      : 'Tu cuenta todavía no tiene inscripciones vinculadas.', rows.length ? 'success' : 'info');
   } catch {
-    if (token === session) message.textContent = 'No se pudo actualizar. Si la sesión ha caducado, vuelve a entrar.';
+    if (token === session) setMessage('No se pudo actualizar. Si la sesión ha caducado, vuelve a entrar.', 'error');
   } finally {
     refreshEnrollments.disabled = false;
   }
@@ -245,7 +253,7 @@ form.onsubmit = async event => {
   const credentials = new FormData(form);
   const button = form.querySelector('button');
   button.disabled = true;
-  message.textContent = 'Iniciando sesión…';
+  setMessage('Iniciando sesión…');
   let signedIn = false;
   try {
     const session = await post('/auth/v1/token?grant_type=password', {
@@ -254,12 +262,12 @@ form.onsubmit = async event => {
     signedIn = true;
     token = session.access_token;
     const rows = await loadEnrollments(token);
-    message.textContent = rows.length ? '' : 'Tu cuenta todavía no tiene inscripciones vinculadas.';
+    setMessage(rows.length ? '' : 'Tu cuenta todavía no tiene inscripciones vinculadas.');
     form.hidden = true;
     get('family').hidden = false;
   } catch {
     token = '';
-    message.textContent = signedIn ? 'No se pudieron cargar las inscripciones.' : 'No se pudo iniciar sesión.';
+    setMessage(signedIn ? 'No se pudieron cargar las inscripciones.' : 'No se pudo iniciar sesión.', 'error');
   } finally {
     form.elements.password.value = '';
     button.disabled = false;
@@ -275,7 +283,7 @@ get('signout').onclick = () => {
   enrollments.replaceChildren();
   get('membershipRequests').replaceChildren();
   get('membershipRequestsStatus').textContent = '';
-  message.textContent = '';
+  setMessage('');
   get('family').hidden = true;
   form.hidden = false;
 };
