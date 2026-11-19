@@ -8,6 +8,38 @@ const statuses = { pending: 'Pendiente', in_review: 'En revisión', confirmed: '
 let token = '';
 let rows = [];
 let revision = 0;
+let registrationPage = 1;
+const registrationPageSize = 20;
+function paginateRegistrations(entries, requestedPage) {
+  const pages = Math.max(1, Math.ceil(entries.length / registrationPageSize));
+  const page = Math.max(1, Math.min(pages, Number(requestedPage) || 1));
+  const start = (page - 1) * registrationPageSize;
+  return {page, pages, start, entries: entries.slice(start, start + registrationPageSize)};
+}
+
+const panelTabs = [...document.querySelectorAll('[data-panel-tab]')];
+function selectPanel(id) {
+  for (const tab of panelTabs) {
+    const selected = tab.dataset.panelTab === id;
+    tab.setAttribute('aria-selected', String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    get(tab.dataset.panelTab).hidden = !selected;
+  }
+}
+for (const [index, tab] of panelTabs.entries()) {
+  tab.addEventListener('click', () => selectPanel(tab.dataset.panelTab));
+  tab.addEventListener('keydown', event => {
+    let target;
+    if (event.key === 'ArrowRight') target = (index + 1) % panelTabs.length;
+    if (event.key === 'ArrowLeft') target = (index + panelTabs.length - 1) % panelTabs.length;
+    if (event.key === 'Home') target = 0;
+    if (event.key === 'End') target = panelTabs.length - 1;
+    if (target === undefined) return;
+    event.preventDefault();
+    selectPanel(panelTabs[target].dataset.panelTab);
+    panelTabs[target].focus();
+  });
+}
 
 async function request(path, body) {
   const headers = { apikey: apiKey, 'Content-Type': 'application/json' };
@@ -208,7 +240,7 @@ function renderPaymentTotals(filtered) {
     const amount = name => money.format(entries.reduce((sum, row) =>
       sum + Math.round(Number(row.paymentFlags[name] ?? 0) * 100), 0) / 100);
     totals.textContent = [
-      entries.length === filtered.length ? 'Importes de las inscripciones mostradas' : 'Importes disponibles (' + entries.length + ' de ' + filtered.length + ')',
+      entries.length === filtered.length ? 'Importes de todas las inscripciones filtradas' : 'Importes disponibles (' + entries.length + ' de ' + filtered.length + ')',
       'Confirmado ' + amount('confirmed'), 'En revisión ' + amount('in_review'), 'Pendiente ' + amount('pending'),
     ].join(' · ');
   }
@@ -285,8 +317,18 @@ function render() {
   get('exportInstallments').disabled = !filtered.some(row =>
     row.paymentFlags?.installments?.some(payment => matchesDueFilter(payment, due)));
   get('count').textContent = filtered.length + (filtered.length === 1 ? ' inscripción' : ' inscripciones');
+  const pagination = paginateRegistrations(filtered, registrationPage);
+  registrationPage = pagination.page;
+  for (const info of document.querySelectorAll('[data-page-information]')) {
+    info.textContent = filtered.length
+      ? 'Página ' + pagination.page + ' de ' + pagination.pages + ' · Mostrando ' + (pagination.start + 1) + '–' + (pagination.start + pagination.entries.length) + ' de ' + filtered.length
+      : '0 resultados';
+  }
+  for (const button of document.querySelectorAll('[data-page-previous]')) button.disabled = pagination.page === 1;
+  for (const button of document.querySelectorAll('[data-page-next]')) button.disabled = pagination.page === pagination.pages;
+  get('emptyRegistrations').hidden = filtered.length > 0;
   renderPaymentTotals(filtered);
-  get('registrations').replaceChildren(...filtered.map(row => {
+  get('registrations').replaceChildren(...pagination.entries.map(row => {
     const entry = document.createElement('li');
     const details = document.createElement('details');
     details.append(item('summary', 'Ver cuotas y estado'));
@@ -526,9 +568,10 @@ async function load() {
     }),
   ]);
   if (revision !== current) return;
-  rows = response;
+  rows = response.sort((a, b) => new Date(b.received_at) - new Date(a.received_at) || a.id.localeCompare(b.id));
   const paymentFilter = get('paymentState');
   paymentFilter.disabled = !paymentStates;
+  get('reviewReceipts').disabled = !paymentStates;
   paymentFilter.title = paymentStates ? '' : 'Ejecuta el SQL 39 para activar este filtro.';
   if (!paymentStates) paymentFilter.value = '';
   const flags = new Map((paymentStates ?? []).map(state => [state.id, state.payment_flags]));
@@ -638,15 +681,27 @@ get('sendReminderTest').onclick = async event => {
     button.disabled = false;
   }
 };
-get('team').addEventListener('change', render);
-get('paymentState').addEventListener('change', render);
-get('paymentMode').addEventListener('change', render);
-get('accountFilter').addEventListener('change', render);
-get('dueFilter').addEventListener('change', render);
-get('categoryFilter').addEventListener('change', render);
-get('kitFilter').addEventListener('change', render);
-get('registrationFrom').addEventListener('change', render);
-get('registrationUntil').addEventListener('change', render);
+function resetPageAndRender() {
+  registrationPage = 1;
+  render();
+}
+for (const id of ['team', 'paymentState', 'paymentMode', 'accountFilter', 'dueFilter', 'categoryFilter', 'kitFilter', 'registrationFrom', 'registrationUntil']) {
+  get(id).addEventListener('change', resetPageAndRender);
+}
+function changeRegistrationPage(offset) {
+  registrationPage += offset;
+  render();
+  get('registrationList').open = true;
+  get('count').scrollIntoView({block: 'start', behavior: 'smooth'});
+}
+for (const button of document.querySelectorAll('[data-page-previous]')) button.onclick = () => changeRegistrationPage(-1);
+for (const button of document.querySelectorAll('[data-page-next]')) button.onclick = () => changeRegistrationPage(1);
+get('reviewReceipts').onclick = () => {
+  clearRegistrationFilters();
+  get('paymentState').value = 'in_review';
+  get('registrationList').open = true;
+  resetPageAndRender();
+};
 function clearRegistrationFilters() {
   for (const id of ['team', 'categoryFilter', 'kitFilter', 'paymentState', 'paymentMode', 'accountFilter', 'dueFilter', 'reference', 'registrationFrom', 'registrationUntil']) {
     get(id).value = '';
@@ -654,7 +709,7 @@ function clearRegistrationFilters() {
 }
 get('clearRegistrationFilters').onclick = () => {
   clearRegistrationFilters();
-  render();
+  resetPageAndRender();
 };
 function downloadCsv(table, filename) {
   const csvCell = value => {
@@ -820,7 +875,7 @@ get('reminderPreview').onsubmit = async event => {
     button.disabled = false;
   }
 };
-get('reference').addEventListener('input', render);
+get('reference').addEventListener('input', resetPageAndRender);
 get('loadMembershipRequests').onclick = async () => {
   const requestMembershipCard = (id, campaign) => request('/functions/v1/' +
     (campaign ? 'enviar-carne-socio-campana' : 'enviar-carne-socio-prueba'), {id});
@@ -1069,6 +1124,8 @@ get('logout').addEventListener('click', () => {
   revision++;
   token = '';
   rows = [];
+  registrationPage = 1;
+  selectPanel('registrationsPane');
   get('registrations').replaceChildren();
   get('reminderResults').replaceChildren();
   get('reminderStatus').textContent = '';
@@ -1078,6 +1135,7 @@ get('logout').addEventListener('click', () => {
   get('panel').hidden = true;
   get('login').hidden = false;
 });
+
 
 
 
