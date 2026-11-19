@@ -194,32 +194,11 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
     </section>
     </section>
     <section id="membersPane" role="tabpanel" aria-labelledby="tabMembers" hidden>
-    <details class="surface">
-      <summary>Descuento de prueba por alta de socio</summary>
-      <p>Consulta el descuento previsto para el correo verificado de la cuenta familiar.</p>
-      <form id="membershipRedemption" class="inline-fields">
-        <label>Correo de la cuenta familiar <input name="email" type="email" required></label>
-        <button>Consultar descuento</button>
-      </form>
-      <p id="membershipRedemptionStatus" role="status"></p>
-    </details>
     <details class="surface" open>
       <summary>Solicitudes de socios 2027/2028</summary>
       <button id="loadMembershipRequests" type="button">Consultar solicitudes</button>
       <p id="membershipRequestStatus" role="status"></p>
       <ul id="membershipRequests"></ul>
-      <details>
-        <summary>Importar padrón para renovaciones</summary>
-        <p>Copia desde la hoja las columnas DNI, nombre, correo y temporada, en ese orden, con la cabecera. Solo se admiten filas de 2026/2027.</p>
-        <form id="renewalDirectoryImport">
-          <label>Datos del padrón anterior <textarea name="directory" rows="5" required></textarea></label>
-          <div class="actions">
-            <button type="submit">Comprobar padrón</button>
-            <button id="saveRenewalDirectory" type="button" hidden>Importar coincidencias</button>
-          </div>
-        </form>
-        <p id="renewalDirectoryStatus" role="status"></p>
-      </details>
     </details>
     </section>
     <section id="remindersPane" role="tabpanel" aria-labelledby="tabReminders" hidden>
@@ -241,7 +220,7 @@ header.club-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1
   </section>
 </main>
 <script src="exportar-packs.js?v=c53ae8de7940" defer></script>
-<script src="panel.js?v=pestanas-paginacion-83" defer></script>
+<script src="panel.js?v=socios-limpieza-84" defer></script>
 </html>
 
 
