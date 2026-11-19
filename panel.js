@@ -58,7 +58,7 @@ async function request(path, body) {
 }
 
 const rpc = (name, body = {}) => request('/rest/v1/rpc/' + name, body);
-const reference = row => 'INS-PRUEBA-' + row.id;
+const reference = row => 'INS-' + row.id;
 
 function teamName(player) {
   if (player.team === 'national') return 'Primera Nacional masculino';
@@ -222,7 +222,7 @@ function filteredRegistrations() {
   const due = get('dueFilter').value;
   return rows.filter(row => {
     const received = filterDate.format(new Date(row.received_at));
-    return (reference(row).toLowerCase().includes(query) || row.accountEmail?.toLowerCase().includes(query) ||
+    return (reference(row).toLowerCase().includes(query.replace(/^ins-prueba-/, 'ins-')) || row.accountEmail?.toLowerCase().includes(query) ||
       row.summary.players.some(player => player.name && searchableName(player.name).includes(nameQuery))) &&
       (!accountFilter || row.accountLinked === (accountFilter === 'linked')) &&
       (!from || received >= from) && (!until || received <= until) &&
@@ -520,7 +520,7 @@ function render() {
     }
     entry.append(registrationDetails(row), details);
     const deletion = document.createElement('details');
-    const remove = item('button', 'Eliminar esta inscripción de prueba');
+    const remove = item('button', 'Eliminar esta inscripción');
     remove.type = 'button';
     const confirmDeletion = document.createElement('input');
     confirmDeletion.type = 'checkbox';
@@ -650,7 +650,7 @@ get('checkScheduledReminder').onclick = async event => {
     const run = await rpc('bm_pinto_latest_registration_test_reminder');
     if (token !== session) return;
     const messages = {
-      accepted: 'El servidor de correo aceptó el aviso de prueba.',
+      accepted: 'El servidor de correo aceptó el aviso de comprobación.',
       failed: 'El intento de envío falló. Revisa los registros de la función.',
       unavailable: 'Intento registrado. La respuesta todavía no está disponible o ya caducó.',
     };
@@ -658,26 +658,6 @@ get('checkScheduledReminder').onclick = async event => {
       : 'El trabajo diario todavía no ha encolado ningún aviso.';
   } catch {
     if (token === session) status.textContent = 'No se pudo consultar el último envío.';
-  } finally {
-    button.disabled = false;
-  }
-};
-get('sendReminderTest').onclick = async event => {
-  const button = event.currentTarget;
-  const dateField = get('reminderPreview').elements.previewDate;
-  if (!dateField.reportValidity()) return;
-  const session = token;
-  const status = get('reminderStatus');
-  button.disabled = true;
-  status.textContent = 'Enviando al buzón de prueba…';
-  try {
-    const result = await request('/functions/v1/recordatorio-cuotas-prueba', { date: dateField.value });
-    if (token === session) status.textContent = result.message;
-  } catch (error) {
-    if (token !== session) return;
-    status.textContent = location.protocol === 'file:'
-      ? 'Para enviar la prueba, abre el panel publicado en GitHub Pages.'
-      : error.serverMessage || 'No se confirmó el envío. Comprueba el buzón y los registros de la función antes de repetirlo.';
   } finally {
     button.disabled = false;
   }
@@ -764,7 +744,7 @@ function exportPayments(detail) {
       account ? (account.agreement_pending ? 'Sí' : 'No') : '',
     ]);
   }
-  downloadCsv(table, detail ? 'cuotas-de-prueba.csv' : 'inscripciones-de-prueba.csv');
+  downloadCsv(table, detail ? 'cuotas.csv' : 'inscripciones.csv');
 }
 get('exportRegistrations').onclick = () => exportPayments(false);
 get('exportInstallments').onclick = () => exportPayments(true);
@@ -799,7 +779,7 @@ get('exportKits').onclick = () => {
     }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'packs-iniciales-de-prueba.xlsx';
+    link.download = 'packs-iniciales.xlsx';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -819,7 +799,7 @@ get('exportPlayers').onclick = () => {
         player.hasKit ? 'Ya lo tiene' : 'Lo necesita', reference(row)]);
     }
   }
-  if (table.length > 1) downloadCsv(table, 'jugadores-de-prueba.csv');
+  if (table.length > 1) downloadCsv(table, 'jugadores.csv');
 };
 get('reminderPreview').onsubmit = async event => {
   event.preventDefault();
@@ -854,7 +834,7 @@ get('reminderPreview').onsubmit = async event => {
       const list = document.createElement('ul');
       for (const payment of payments) {
         list.append(item('li', [
-          payment.reference, 'Cuota ' + payment.installment,
+          payment.reference.replace(/^INS-PRUEBA-/, 'INS-'), 'Cuota ' + payment.installment,
           payment.due_on.split('-').reverse().join('/'), money.format(payment.amount),
         ].join(' · ')));
       }
@@ -945,22 +925,22 @@ function renderMembers() {
       }
       showMembershipDiscounts(request);
       const cardStatus = item('p', {
-        sent: campaign ? 'Carné enviado al correo del socio.' : 'Carné de prueba enviado.',
+        sent: campaign ? 'Carné enviado al correo del socio.' : 'Comprobación del carné enviada al buzón del club.',
         sending: 'Envío en curso o pendiente de comprobar.',
-        uncertain: 'Envío sin confirmar. Revisa el buzón de prueba.',
+        uncertain: 'Envío sin confirmar. Revisa el buzón del club.',
         failed: 'Falló la preparación del carné. Puedes reintentar.',
       }[request.card_state] ?? '');
       cardStatus.setAttribute('role', 'status');
-      const sendCard = item('button', campaign ? 'Enviar carné al socio' : 'Enviar carné de prueba');
+      const sendCard = item('button', campaign ? 'Enviar carné al socio' : 'Enviar comprobación al club');
       sendCard.type = 'button';
       sendCard.hidden = !request.approved_at || ['sent', 'sending', 'uncertain'].includes(request.card_state);
       async function sendApprovedCard() {
         if (location.protocol === 'file:') {
-          cardStatus.textContent = 'La solicitud está validada. Abre el panel publicado en GitHub Pages para enviar el carné de prueba.';
+          cardStatus.textContent = 'La solicitud está validada. Abre el panel publicado en la web del club para enviar el carné.';
           return;
         }
         sendCard.disabled = true;
-        cardStatus.textContent = 'Preparando el carné de prueba…';
+        cardStatus.textContent = 'Preparando el carné…';
         try {
           const result = await requestMembershipCard(request.id, campaign);
           if (token !== session || !entry.isConnected) return;
@@ -971,7 +951,7 @@ function renderMembers() {
           return true;
         } catch (error) {
           if (token !== session || !entry.isConnected) return;
-          cardStatus.textContent = error.serverMessage || 'No se confirmó el envío. Comprueba el buzón de prueba.';
+          cardStatus.textContent = error.serverMessage || 'No se confirmó el envío. Comprueba el buzón del club.';
           return false;
         } finally {
           sendCard.disabled = false;
@@ -990,13 +970,13 @@ function renderMembers() {
       approve.type = 'button';
       approve.hidden = Boolean(request.approved_at || request.rejected_at || request.awaiting_receipt ||
         (request.kind === 'renew' && (!request.previous_member || !request.profile?.email)));
-      const rejectRequest = item('button', 'Rechazar solicitud de prueba');
+      const rejectRequest = item('button', 'Rechazar solicitud');
       rejectRequest.type = 'button';
       rejectRequest.className = 'secondary';
       rejectRequest.hidden = Boolean(request.approved_at || request.rejected_at);
       rejectRequest.onclick = async () => {
         if (memberActionBusy) return;
-        if (!window.confirm('¿Rechazar esta solicitud de prueba? El socio podrá enviar una nueva con el mismo documento.')) return;
+        if (!window.confirm('¿Rechazar esta solicitud? El socio podrá enviar una nueva con el mismo documento.')) return;
         memberActionBusy = true;
         approve.disabled = rejectRequest.disabled = true;
         try {
@@ -1025,7 +1005,7 @@ function renderMembers() {
           const url = URL.createObjectURL(new Blob([bytes], {type: receipt.mime}));
           const link = document.createElement('a');
           link.href = url;
-          link.download = 'socio-prueba-' + request.id + '.' + extension;
+          link.download = 'justificante-socio-' + request.id + '.' + extension;
           link.click();
           setTimeout(() => URL.revokeObjectURL(url), 1000);
         } catch {
@@ -1074,10 +1054,10 @@ function renderMembers() {
           }
         }
       };
-      entry.append(item('strong', title), item('p', 'Referencia SOCIO-PRUEBA-' + request.id));
+      entry.append(item('strong', title), item('p', 'Referencia SOCIO-' + request.id));
       if (request.profile?.email) entry.append(item('p', request.profile.email));
       if (!approve.hidden) entry.append(item('p', campaign
-        ? 'Al validar se enviará el carné al correo del socio.' : 'Esta solicitud utiliza el buzón de prueba para el carné.'));
+        ? 'Al validar se enviará el carné al correo del socio.' : 'Esta solicitud está configurada para una comprobación interna; el carné no se enviará al socio.'));
       entry.append(result, discounts, download, ' ', approve, ' ', rejectRequest, ' ', sendCard, cardStatus);
       list.append(entry);
     }
