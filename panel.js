@@ -1022,90 +1022,6 @@ get('loadMembershipRequests').onclick = async () => {
     loadButton.disabled = false;
   }
 };
-const directoryForm = get('renewalDirectoryImport');
-const directoryStatus = get('renewalDirectoryStatus');
-const saveDirectory = get('saveRenewalDirectory');
-let checkedDirectory = null;
-function resetDirectoryPreview() {
-  checkedDirectory = null;
-  saveDirectory.hidden = true;
-  directoryStatus.textContent = '';
-}
-directoryForm.elements.directory.oninput = resetDirectoryPreview;
-async function importDirectory(preview) {
-  if (!token || !directoryForm.reportValidity()) return;
-  const session = token;
-  const input = directoryForm.elements.directory;
-  const source = input.value.trim();
-  if (!preview && source !== checkedDirectory) return;
-  const [header, ...lines] = source.split(/\r?\n/).filter(line => line.trim());
-  const labels = header.split('\t').map(value => value.trim().toLowerCase());
-  if (labels.length !== 4 || labels[0] !== 'dni' || !['nombre', 'nombre y apellidos'].includes(labels[1]) ||
-    !['correo', 'correo electrónico', 'dirección de correo electrónico'].includes(labels[2]) || labels[3] !== 'temporada') {
-    directoryStatus.textContent = 'La cabecera debe tener DNI, nombre, correo y temporada en ese orden.';
-    return;
-  }
-  if (!lines.length || lines.length > 1000 || lines.some(line => line.split('\t').length !== 4)) {
-    directoryStatus.textContent = 'Copia entre 1 y 1.000 filas con cuatro columnas.';
-    return;
-  }
-  const rows = lines.map(line => {
-    const [identifier, name, email, season] = line.split('\t').map(value => value.trim());
-    return {identifier, name, email, season};
-  });
-  const buttons = [...directoryForm.querySelectorAll('button')];
-  buttons.forEach(button => { button.disabled = true; });
-  input.disabled = true;
-  resetDirectoryPreview();
-  directoryStatus.textContent = preview ? 'Comprobando el padrón…' : 'Importando las coincidencias…';
-  try {
-    const result = await rpc('bm_pinto_import_renewal_directory', {p_rows: rows, p_preview: preview});
-    if (token !== session) return;
-    directoryStatus.textContent = (preview ? 'Filas que coinciden: ' : 'Filas importadas o ya registradas: ') +
-      result.matched_rows + ' · Sin coincidencia: ' + result.unknown_rows + '.';
-    if (preview && result.matched_rows > 0) {
-      checkedDirectory = source;
-      saveDirectory.hidden = false;
-    } else if (!preview) {
-      directoryForm.reset();
-    }
-  } catch (error) {
-    if (token === session) directoryStatus.textContent = error.serverMessage || 'No se pudo comprobar el padrón.';
-  } finally {
-    buttons.forEach(button => { button.disabled = false; });
-    input.disabled = false;
-  }
-}
-directoryForm.onsubmit = event => {
-  event.preventDefault();
-  if (!directoryForm.elements.directory.disabled) importDirectory(true);
-};
-saveDirectory.onclick = () => importDirectory(false);
-const membershipForm = get('membershipRedemption');
-const discountStatus = get('membershipRedemptionStatus');
-membershipForm.elements.email.oninput = () => { discountStatus.textContent = ''; };
-membershipForm.onsubmit = async event => {
-  event.preventDefault();
-  const session = token;
-  const input = membershipForm.elements.email;
-  const button = membershipForm.querySelector('button');
-  if (!session || button.disabled) return;
-  const address = input.value.trim();
-  button.disabled = input.disabled = true;
-  discountStatus.textContent = 'Consultando descuento…';
-  try {
-    const result = await rpc('bm_pinto_registration_test_membership_redemption', {p_email: address});
-    if (token !== session) return;
-    discountStatus.textContent = result.status === 'redeemed' ? 'Descuento de prueba ya registrado: ' + money.format(result.amount) + '.'
-      : result.status === 'no_account' ? 'No hay una cuenta familiar verificada con ese correo.'
-      : result.discount > 0 ? 'Descuento previsto en el alta: ' + money.format(result.discount) + '.'
-      : 'Esta cuenta no tiene descuento disponible.';
-  } catch {
-    if (token === session) discountStatus.textContent = 'No se pudo comprobar el descuento.';
-  } finally {
-    button.disabled = input.disabled = false;
-  }
-};
 get('refresh').addEventListener('click', async () => {
   try {
     await load();
@@ -1117,10 +1033,6 @@ get('refresh').addEventListener('click', async () => {
 get('logout').addEventListener('click', () => {
   get('membershipRequests').replaceChildren();
   get('membershipRequestStatus').textContent = '';
-  directoryForm.reset();
-  resetDirectoryPreview();
-  discountStatus.textContent = '';
-  membershipForm.reset();
   revision++;
   token = '';
   rows = [];
